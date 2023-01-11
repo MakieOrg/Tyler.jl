@@ -1,0 +1,13 @@
+name = "Tyler"
+uuid = "e170d443-b9d6-418a-9ee8-061e966341ef"
+authors = ["SimonDanisch"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
