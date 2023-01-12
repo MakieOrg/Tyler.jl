@@ -2,7 +2,7 @@
 
 *Tiles yler*
 
-A package for downloading tiles on demand from different providers.  
+A package for downloading tiles on demand from different providers.
 
 !!! info
     - s
@@ -17,7 +17,7 @@ using Pkg
 Pkg.add(["https://github.com/JuliaGeo/TileProviders.jl", "https://github.com/SimonDanisch/MapTiles.jl.git", "https://github.com/MakieOrg/Tyler.jl.git"])
 ```
 
-or 
+or
 
 ```julia
 ] add https://github.com/JuliaGeo/TileProviders.jl https://github.com/SimonDanisch/MapTiles.jl.git https://github.com/MakieOrg/Tyler.jl.git

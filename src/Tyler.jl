@@ -34,6 +34,19 @@ struct Map
     screen::Makie.MakieScreen
 end
 
+# Wait for all tiles to be
+function Base.wait(map::Map)
+    while !isempty(map.tiles_being_added)
+        wait(last(first(map.tiles_being_added)))
+    end
+end
+
+Base.showable(::MIME"image/png", ::Map) = true
+function Base.show(io::IO, m::MIME"image/png", map::Map)
+    wait(map)
+    show(io, m, map.figure)
+end
+
 function Map(rect::Rect, zoom=15, input_cs = wgs84;
         figure=Figure(resolution=(1500, 1500)),
         coordinate_system = MapTiles.web_mercator,
