@@ -1,20 +1,12 @@
 using Tyler
 using Test
+using GLMakie
 
-@testset "Tyler.jl" begin
-    # Write your tests here.
-end
+Tyler.Map(Rect2f(-0.0921, 51.5, 0.04, 0.025))
 
-@testset "" begin
+begin
     tiles = MapTiles.TileGrid(extent(rect), 15, wgs84)
-
-tile = first(tiles)
-
-
-translate!(plot, xmin, ymin, 0)
-scale!(plot, xmax - xmin, ymax - ymin, 0)
-
-provider = MapTiles.OpenStreetMapProvider(variant="standard")
+    provider = MapTiles.OpenStreetMapProvider(variant="standard")
     fig = Figure()
     ax = Axis(fig[1, 1]; aspect=DataAspect())
     display(fig)
