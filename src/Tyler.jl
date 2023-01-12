@@ -3,63 +3,60 @@ module Tyler
 using Makie
 using LinearAlgebra
 using MapTiles
-using MapTiles: Tile
+using MapTiles: Tile, TileGrid, web_mercator, wgs84
 using Colors
 using Colors: N0f8
 using LRUCache
 using GeometryBasics
 using GeometryBasics: GLTriangleFace, decompose_uv
+using MapTiles.GeoFormatTypes: CoordinateReferenceSystemFormat
+using Extents
+using GeoInterface
+using ThreadSafeDicts
 
 const TileImage = Matrix{RGB{N0f8}}
 
 struct Map
     provider::MapTiles.AbstractProvider
+    coordinate_system::CoordinateReferenceSystemFormat
+    zoom::Observable{Int}
     figure::Figure
     axis::Axis
     displayed_tiles::Set{MapTiles.Tile}
     plots::Dict{MapTiles.Tile,Any}
     free_tiles::Vector{Makie.Combined}
     fetched_tiles::LRU{Tile,TileImage}
-    tiles_being_added::Dict{Tile,Task}
+    tiles_being_added::ThreadSafeDict{Tile,Task}
     downloaded_tiles::Channel{Tuple{Tile,TileImage}}
+    display_task::Base.RefValue{Task}
+    screen::Makie.MakieScreen
 end
 
-function fetch_tile(tyler::Map, tile::Tile)
-    return get!(tyler.fetched_tiles, tile) do
-        MapTiles.fetchrastertile(tyler.provider, tile)
-    end
-end
-
-function fetch_tile!(tyler::Map, tile)
-    queue = tyler.tiles_being_added
-    # NO need to start a need task!
-    haskey(queue, tile) && return
-    queue[tile] = Threads.@spawn begin
-        try
-            img = fetch_tile(tyler, tile)
-            # we may have moved already and the tile doesn't need to be displayed anymore
-            if tile in tyler.displayed_tiles
-                put!(tyler.downloaded_tiles, (tile, img))
-            end
-        catch e
-            @warn "error while downloading tile" exception = (e, Base.catch_backtrace())
-        finally
-            delete!(queue, tile)
-        end
-    end
-end
-
-function Map(minlon, minlat, maxlon, maxlat, zoom=15; figure=Figure(), provider=MapTiles.OpenStreetMapProvider(variant="standard"), cache_size_gb=5)
-    axis = Axis(figure[1, 1]; aspect=AxisAspect(1), limits=(minlon, maxlon, minlat, maxlat))
-    plots = Dict{Tile,Any}()
-    tiles = MapTiles.get_tiles(minlon, minlat, maxlon, maxlat, zoom)
+function Map(rect::Rect, zoom=15, input_cs = wgs84;
+        figure=Figure(resolution=(1500, 1500)),
+        coordinate_system = MapTiles.web_mercator,
+        provider=MapTiles.OpenStreetMapProvider(variant="standard"),
+        cache_size_gb=5)
+    ext = extent(rect)
+    tiles = MapTiles.TileGrid(ext, zoom, input_cs)
     fetched_tiles = LRU{Tile, Matrix{RGB{N0f8}}}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
     free_tiles = Makie.Combined[]
-    tiles_being_added = Dict{Tile,Task}()
+    tiles_being_added = ThreadSafeDict{Tile,Task}()
     downloaded_tiles = Channel{Tuple{Tile,TileImage}}(128)
-    tyler = Map(provider, figure, axis, Set(tiles), plots, free_tiles, fetched_tiles, tiles_being_added, downloaded_tiles)
     screen = display(figure)
-    @async begin
+    display_task = Base.RefValue{Task}()
+    ext_target = MapTiles.project_extent(ext, input_cs, coordinate_system)
+    X = ext_target.X
+    Y = ext_target.Y
+    axis = Axis(figure[1, 1]; aspect=DataAspect(), limits=(X[1], X[2], Y[1], Y[2]))
+    plots = Dict{Tile,Any}()
+    tyler = Map(
+        provider, coordinate_system, Observable(zoom),
+        figure, axis, Set(tiles), plots, free_tiles,
+        fetched_tiles, tiles_being_added, downloaded_tiles,
+        display_task, screen
+    )
+    display_task[] = @async begin
         while isopen(screen)
             tile, img = take!(downloaded_tiles)
             try
@@ -69,7 +66,9 @@ function Map(minlon, minlat, maxlon, maxlat, zoom=15; figure=Figure(), provider=
             end
         end
     end
-    queue_tiles!(tyler, tiles)
+
+    # Queue tiles to be downloaded & displayed
+    foreach(tile -> queue_tile!(tyler, tile), tiles)
 
     on(axis.finallimits) do rect
         update_tiles!(tyler, rect)
@@ -89,21 +88,26 @@ function remove_tiles!(tyler::Map, tiles::Set{Tile})
 end
 
 function create_tileplot!(axis, image)
+    # Use a mesh plot until image rotr90 is fixed
+    # Also, this will make it easier to subdivide the image mesh
+    # To apply some other coordinate transforms
+    # use GeometryBasics.Tesselation(rect, (128, 128)) to get a 128x128 subdivied mesh
     rect = Rect2f(0, 0, 1, 1)
     points = decompose(Point2f, rect)
     faces = decompose(GLTriangleFace, rect)
     uv = decompose_uv(rect)
     map!(uv -> Vec2f(uv[1], 1 - uv[2]), uv, uv)
     m = GeometryBasics.Mesh(meta(points; uv=uv), faces)
-    return mesh!(axis, m; color=image, shading=false)
+    # Plot directly into scene to not update limits
+    return mesh!(axis.scene, m; color=image, shading=false)
 end
 
-function place_tile!(tyler::Map, tile::Tile, plot)
-    bounds = MapTiles.bounds(tile)
-    lonmin, lonmax = bounds.X
-    latmin, latmax = bounds.Y
-    translate!(plot, lonmin, latmin, 0)
-    scale!(plot, lonmax - lonmin, latmax - latmin, 0)
+function place_tile!(tile::Tile, plot, coordinate_system)
+    bounds = MapTiles.extent(tile, coordinate_system)
+    xmin, xmax = bounds.X
+    ymin, ymax = bounds.Y
+    translate!(plot, xmin, ymin, 0)
+    scale!(plot, xmax - xmin, ymax - ymin, 0)
     return
 end
 
@@ -121,28 +125,68 @@ function create_tile_plot!(tyler::Map, tile::Tile, image::TileImage)
         mplot.color[] = image
     end
     tyler.plots[tile] = mplot
-    place_tile!(tyler, tile, mplot)
+    place_tile!(tile, mplot, tyler.coordinate_system)
 end
 
-function queue_tiles!(tyler::Map, tiles)
-    for tile in tiles
-        fetch_tile!(tyler, tile)
+
+function fetch_tile(tyler::Map, tile::Tile)
+    return get!(tyler.fetched_tiles, tile) do
+        MapTiles.fetchrastertile(tyler.provider, tile)
     end
 end
 
-function update_tiles!(tyler::Map, limit_rect::Rect)
-    min_latlon, max_latlon = extrema(limit_rect)
-    zoom = first(tyler.displayed_tiles).zoom
-    new_tiles = Set(MapTiles.get_tiles(min_latlon[1], min_latlon[2], max_latlon[1], max_latlon[2], zoom))
-    to_add = setdiff(new_tiles, tyler.displayed_tiles)
-    to_remove = setdiff(tyler.displayed_tiles, new_tiles)
+function queue_tile!(tyler::Map, tile)
+    queue = tyler.tiles_being_added
+    # NO need to start a need task!
+    haskey(queue, tile) && return
+    queue[tile] = Threads.@spawn begin
+        try
+            img = fetch_tile(tyler, tile)
+            # we may have moved already and the tile doesn't need to be displayed anymore
+            if tile in tyler.displayed_tiles
+                put!(tyler.downloaded_tiles, (tile, img))
+            end
+        catch e
+            @warn "error while downloading tile" exception = (e, Base.catch_backtrace())
+        finally
+            delete!(queue, tile)
+        end
+    end
+end
+
+function Extents.extent(rect::Rect2)
+    (xmin, ymin), (xmax, ymax) = extrema(rect)
+    return Extent(X=(xmin, xmax), Y=(ymin, ymax))
+end
+
+function get_tiles(extent::Extent, crs, zoom::Int, mintiles::Int, maxtiles::Int, tries=1)
+    new_tiles = MapTiles.TileGrid(extent, zoom, crs)
+    if zoom <= 1 || zoom >= 19 || tries > 10
+        return new_tiles, zoom
+    end
+    if length(new_tiles) > maxtiles
+        return get_tiles(extent, crs, max(zoom - 1, 1), mintiles, maxtiles, tries + 1)
+    elseif length(new_tiles) <= mintiles
+        return get_tiles(extent, crs, min(zoom + 1, 19), mintiles, maxtiles, tries + 1)
+    end
+    return new_tiles, zoom
+end
+
+function update_tiles!(tyler::Map, rect::Rect2)
+    xytiles = round(Int, maximum(size(tyler.screen) ./ 256))
+    mintiles = (xytiles - 1)^2
+    maxtiles = (xytiles + 1)^2
+    new_tiles, new_zoom = get_tiles(extent(rect), tyler.coordinate_system, tyler.zoom[], mintiles, maxtiles)
+    tyler.zoom[] = new_zoom
+    new_tiles_set = Set(new_tiles)
+    to_add = setdiff(new_tiles_set, tyler.displayed_tiles)
+    to_remove = setdiff(tyler.displayed_tiles, new_tiles_set)
     remove_tiles!(tyler, to_remove)
     # replace
     empty!(tyler.displayed_tiles)
-    union!(tyler.displayed_tiles, new_tiles)
-
-    queue_tiles!(tyler, to_add)
+    union!(tyler.displayed_tiles, new_tiles_set)
+    # Queue tiles to be downloaded & displayed
+    foreach(tile -> queue_tile!(tyler, tile), to_add)
 end
-
 
 end
