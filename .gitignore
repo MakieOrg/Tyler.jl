@@ -10,4 +10,4 @@ docs/site
 docs/build
 docs/var
 deps/build.jl
-Manifest.toml
+!docs/Manifest.toml
