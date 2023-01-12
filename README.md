@@ -8,5 +8,7 @@ Install like this until deps are registered:
 ```julia
 using Tyler
 using GLMakie
-Tyler.Map(Rect2f(-0.0921, 51.5, 0.04, 0.025))
+tyler = Tyler.Map(Rect2f(-0.0921, 51.5, 0.04, 0.025))
+using TileProviders
+using MapTiles
 ```
