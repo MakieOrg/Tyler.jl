@@ -244,13 +244,13 @@ end
 
 function get_tiles(extent::Extent, crs, zoom::Int, min_zoom::Int, max_zoom::Int, min_tiles::Int, max_tiles::Int, tries=1)
     new_tiles = MapTiles.TileGrid(extent, zoom, crs)
-    if zoom == min_zoom || zoom == max_zoom || tries > 10
+    if tries > 10
         return new_tiles, zoom
     end
-    if zoom < min_zoom || zoom > max_zoom
-        zoom = clamp(zoom, min_zoom, max_zoom)
-        return get_tiles(extent, crs, zoom, min_zoom, max_zoom, min_tiles, max_tiles, tries + 1)
-    end
+    # if zoom < min_zoom || zoom > max_zoom
+    #     zoom = clamp(zoom, min_zoom, max_zoom)
+    #     return get_tiles(extent, crs, zoom, min_zoom, max_zoom, min_tiles, max_tiles, tries + 1)
+    # end
     if length(new_tiles) > max_tiles
         return get_tiles(extent, crs, max(zoom - 1, min_zoom), min_zoom, max_zoom, min_tiles, max_tiles, tries + 1)
     elseif length(new_tiles) <= min_tiles
@@ -284,6 +284,17 @@ function update_tiles!(tyler::Map, display_rect::Rect2)
 
     # Queue tiles to be downloaded & displayed
     foreach(tile -> queue_tile!(tyler, tile), to_add)
+end
+
+function debug_tile!(map::Tyler.Map, tile::Tile)
+    plot = linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1)
+    Tyler.place_tile!(tile, plot, web_mercator)
+end
+
+function debug_tiles!(map::Tyler.Map)
+    for tile in m.displayed_tiles
+        debug_tile!(m, tile)
+    end
 end
 
 end
