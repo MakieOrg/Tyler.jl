@@ -416,9 +416,9 @@ version = "1.0.2"
 
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "Dates", "IniFile", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
-git-tree-sha1 = "752b7f2640a30bc991d37359d5fff50ce856ecde"
+git-tree-sha1 = "a1fd86ba1fae7c73fd98c7e60f8adf036c31d441"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "1.7.1"
+version = "1.7.2"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg"]
@@ -744,7 +744,7 @@ version = "0.6.1"
 
 [[deps.MapTiles]]
 deps = ["Extents", "GeoFormatTypes", "GeoInterface", "HTTP", "ImageMagick", "ProtoBuf", "TileProviders"]
-git-tree-sha1 = "d40175ff8708d2ce2a829c7b4f6f11ab8adac287"
+git-tree-sha1 = "afa06964d5b14a2f67c43f0d95dfdf85362b3600"
 repo-rev = "master"
 repo-url = "https://github.com/SimonDanisch/MapTiles.jl.git"
 uuid = "fea52e5a-b371-463b-85f5-81770daa2737"
@@ -933,9 +933,9 @@ version = "0.5.11"
 
 [[deps.Parsers]]
 deps = ["Dates", "SnoopPrecompile"]
-git-tree-sha1 = "6466e524967496866901a78fca3f2e9ea445a559"
+git-tree-sha1 = "8175fc2b118a3755113c8e68084dc1a9e63c61ee"
 uuid = "69de0a69-1ddd-5017-9359-2bf0b02dc9f0"
-version = "2.5.2"
+version = "2.5.3"
 
 [[deps.Pixman_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1266,7 +1266,7 @@ version = "0.6.3"
 
 [[deps.TileProviders]]
 deps = ["Dates", "JSON3"]
-git-tree-sha1 = "4fe0c3b3d04bf102e9bc001fefbc38f008227a56"
+git-tree-sha1 = "95520b9a9ed38ee4986629904c189b2ad635200d"
 repo-rev = "main"
 repo-url = "https://github.com/JuliaGeo/TileProviders.jl"
 uuid = "263fe934-28e1-4ae9-998a-c2629c5fede6"
@@ -1289,7 +1289,7 @@ uuid = "9d95972d-f1c8-5527-a6e0-b4b365fa01f6"
 version = "1.3.0"
 
 [[deps.Tyler]]
-deps = ["Colors", "Extents", "GeoInterface", "GeometryBasics", "LRUCache", "LinearAlgebra", "Makie", "MapTiles", "ThreadSafeDicts", "TileProviders"]
+deps = ["Colors", "Extents", "GeoInterface", "GeometryBasics", "HTTP", "ImageMagick", "LRUCache", "LinearAlgebra", "Makie", "MapTiles", "ThreadSafeDicts", "TileProviders"]
 path = ".."
 uuid = "e170d443-b9d6-418a-9ee8-061e966341ef"
 version = "0.1.0"
