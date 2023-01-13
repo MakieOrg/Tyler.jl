@@ -27,4 +27,5 @@ for (d, paths) in (("tutorial", srcsfiles),)
     end
 end
 
+mkdir(joinpath(OUTPUT, "/UserGuide/data"))
 cp(joinpath(@__DIR__, ".","examples/data/"), joinpath(OUTPUT, "/UserGuide/data"), force=true)
