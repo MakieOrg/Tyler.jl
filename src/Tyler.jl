@@ -4,6 +4,7 @@ using Makie
 using LinearAlgebra
 using MapTiles
 using MapTiles: Tile, TileGrid, web_mercator, wgs84
+using TileProviders: TileProviders, AbstractProvider, Provider
 using Colors
 using Colors: N0f8
 using LRUCache
@@ -17,7 +18,7 @@ using ThreadSafeDicts
 const TileImage = Matrix{RGB{N0f8}}
 
 struct Map
-    provider::MapTiles.AbstractProvider
+    provider::AbstractProvider
     coordinate_system::CoordinateReferenceSystemFormat
     min_tiles::Int
     max_tiles::Int
@@ -47,10 +48,10 @@ function Base.show(io::IO, m::MIME"image/png", map::Map)
     show(io, m, map.figure)
 end
 
-function Map(rect::Rect, zoom=15, input_cs = wgs84;
+function Map(rect::Rect, zoom=3, input_cs = wgs84;
         figure=Figure(resolution=(1500, 1500)),
         coordinate_system = MapTiles.web_mercator,
-        provider=MapTiles.Providers.OpenStreetMap(:Mapnik),
+        provider=TileProviders.OpenStreetMap(:Mapnik),
         min_tiles=Makie.automatic,
         max_tiles=Makie.automatic,
         cache_size_gb=5)
@@ -65,12 +66,12 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
         error("please load either GLMakie, WGLMakie or CairoMakie")
     end
     display_task = Base.RefValue{Task}()
-    xytiles = round(Int, maximum(size(screen) ./ 256))
+    nx, ny = cld.(size(screen), 256)
     if !(min_tiles isa Int)
-        min_tiles = (xytiles - 2)^2
+        min_tiles = fld(nx, 2) * fld(ny, 2)
     end
     if !(max_tiles isa Int)
-        max_tiles = (xytiles + 1)^2
+        max_tiles = nx * ny
     end
     ext_target = MapTiles.project_extent(ext, input_cs, coordinate_system)
     X = ext_target.X
@@ -189,13 +190,13 @@ end
 
 function get_tiles(extent::Extent, crs, zoom::Int, min_tiles::Int, max_tiles::Int, tries=1)
     new_tiles = MapTiles.TileGrid(extent, zoom, crs)
-    if zoom <= 1 || zoom >= 19 || tries > 10
+    if zoom <= 0 || zoom >= 20 || tries > 10
         return new_tiles, zoom
     end
     if length(new_tiles) > max_tiles
-        return get_tiles(extent, crs, max(zoom - 1, 1), min_tiles, max_tiles, tries + 1)
+        return get_tiles(extent, crs, max(zoom - 1, 0), min_tiles, max_tiles, tries + 1)
     elseif length(new_tiles) <= min_tiles
-        return get_tiles(extent, crs, min(zoom + 1, 19), min_tiles, max_tiles, tries + 1)
+        return get_tiles(extent, crs, min(zoom + 1, 20), min_tiles, max_tiles, tries + 1)
     end
     return new_tiles, zoom
 end
