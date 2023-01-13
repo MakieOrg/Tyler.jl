@@ -55,7 +55,7 @@ end
 function Map(rect::Rect, zoom=15, input_cs = wgs84;
         figure=Figure(resolution=(1500, 1500)),
         coordinate_system = MapTiles.web_mercator,
-        provider=MapTiles.Providers.OpenStreetMap(:Mapnik),
+        provider= MapTiles.Providers.OpenStreetMap(:Mapnik),
         min_tiles=Makie.automatic,
         max_tiles=Makie.automatic,
         max_parallel_downloads = 16,
