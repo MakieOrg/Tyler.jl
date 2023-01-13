@@ -27,4 +27,4 @@ for (d, paths) in (("tutorial", srcsfiles),)
     end
 end
 
-cp("examples/data/", "src/examples/generated/UserGuide/data", force=true)
+cp(joinpath(@__DIR__, ".","examples/data/"), joinpath(OUTPUT, "/UserGuide/data"), force=true)
