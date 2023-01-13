@@ -1,8 +1,6 @@
 # Tyler.jl
 
-*Tiles yler*
-
-A package for downloading tiles on demand from different data source providers.
+A package for downloading map tiles on demand from different data source providers.
 
 !!! info
     - This package is currently in the initial phase of development. 
