@@ -13,6 +13,8 @@ using MapTiles.GeoFormatTypes: CoordinateReferenceSystemFormat
 using Extents
 using GeoInterface
 using ThreadSafeDicts
+using HTTP
+using ImageMagick
 
 const TileImage = Matrix{RGB{N0f8}}
 
@@ -25,12 +27,15 @@ struct Map
     figure::Figure
     axis::Axis
     displayed_tiles::Set{MapTiles.Tile}
-    plots::Dict{MapTiles.Tile,Any}
+    plots::Dict{Tile,Any}
     free_tiles::Vector{Makie.Combined}
     fetched_tiles::LRU{Tile,TileImage}
+    max_parallel_downloads::Int
+    queued_but_not_downloaded::Set{Tile}
     tiles_being_added::ThreadSafeDict{Tile,Task}
     downloaded_tiles::Channel{Tuple{Tile,TileImage}}
     display_task::Base.RefValue{Task}
+    download_task::Base.RefValue{Task}
     screen::Makie.MakieScreen
 end
 
@@ -53,6 +58,7 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
         provider= MapTiles.Providers.OpenStreetMap(:Mapnik),
         min_tiles=Makie.automatic,
         max_tiles=Makie.automatic,
+        max_parallel_downloads = 16,
         cache_size_gb=5)
     ext = extent(rect)
     tiles = MapTiles.TileGrid(ext, zoom, input_cs)
@@ -65,6 +71,7 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
         error("please load either GLMakie, WGLMakie or CairoMakie")
     end
     display_task = Base.RefValue{Task}()
+    download_task = Base.RefValue{Task}()
     xytiles = round(Int, maximum(size(screen) ./ 256))
     if !(min_tiles isa Int)
         min_tiles = (xytiles - 2)^2
@@ -81,9 +88,21 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
         provider, coordinate_system,
         min_tiles, max_tiles, Observable(zoom),
         figure, axis, Set(tiles), plots, free_tiles,
-        fetched_tiles, tiles_being_added, downloaded_tiles,
-        display_task, screen
+        fetched_tiles,
+        max_parallel_downloads, Set{Tile}(),
+        tiles_being_added, downloaded_tiles,
+        display_task, download_task, screen
     )
+    download_task[] = @async begin
+        while isopen(screen)
+            # we dont download all tiles at once, so when one download task finishes, we may want to schedule more downloads:
+            if !isempty(tyler.queued_but_not_downloaded)
+                queue_tile!(tyler, pop!(tyler.queued_but_not_downloaded))
+            end
+            sleep(0.01)
+        end
+    end
+    #
     display_task[] = @async begin
         while isopen(screen)
             tile, img = take!(downloaded_tiles)
@@ -105,14 +124,30 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
     return tyler
 end
 
-function remove_tiles!(tyler::Map, tiles::Set{Tile})
-    for tile in tiles
-        if haskey(tyler.plots, tile)
-            plot = pop!(tyler.plots, tile)
+function stop_download!(map::Map, tile::Tile)
+    # delete!(map.tiles_being_added, tile)
+    # TODO can we actually interrupt downloads?
+    # Doesn't seem to work this way at least:
+    # if haskey(map.tiles_being_added, tile)
+    #     task = map.tiles_being_added[tile]
+    #     ex = InterruptException()
+    #     Base.throwto(task, ex)
+    # end
+end
+
+function remove_tiles!(map::Map, tiles_being_displayed::Set{Tile})
+    to_remove_plots = setdiff(keys(map.plots), tiles_being_displayed)
+    for tile in to_remove_plots
+        if haskey(map.plots, tile)
+            plot = pop!(map.plots, tile)
             plot.visible = false
-            push!(tyler.free_tiles, plot)
+            push!(map.free_tiles, plot)
         end
     end
+    remove_from_queue = setdiff(map.queued_but_not_downloaded, tiles_being_displayed)
+    foreach(t-> delete!(map.queued_but_not_downloaded, t), remove_from_queue)
+    to_remove_downloads = setdiff(keys(map.tiles_being_added), tiles_being_displayed)
+    foreach(t -> stop_download!(map, t), to_remove_downloads)
 end
 
 function create_tileplot!(axis, image)
@@ -127,14 +162,14 @@ function create_tileplot!(axis, image)
     map!(uv -> Vec2f(uv[1], 1 - uv[2]), uv, uv)
     m = GeometryBasics.Mesh(meta(points; uv=uv), faces)
     # Plot directly into scene to not update limits
-    return mesh!(axis.scene, m; color=image, shading=false)
+    return mesh!(axis.scene, m; color=image, shading=false, inspectable=false)
 end
 
 function place_tile!(tile::Tile, plot, coordinate_system)
     bounds = MapTiles.extent(tile, coordinate_system)
     xmin, xmax = bounds.X
     ymin, ymax = bounds.Y
-    translate!(plot, xmin, ymin, 0)
+    translate!(plot, xmin, ymin, tile.z)
     scale!(plot, xmax - xmin, ymax - ymin, 0)
     return
 end
@@ -156,10 +191,12 @@ function create_tile_plot!(tyler::Map, tile::Tile, image::TileImage)
     place_tile!(tile, mplot, tyler.coordinate_system)
 end
 
-
 function fetch_tile(tyler::Map, tile::Tile)
     return get!(tyler.fetched_tiles, tile) do
-        MapTiles.fetchrastertile(tyler.provider, tile)
+        # TODO refactor fetch_tile in MapProvider to allow passing these parameters
+        url = Providers.geturl(tyler.provider, tile)
+        result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
+        return ImageMagick.readblob(result.body)
     end
 end
 
@@ -167,15 +204,33 @@ function queue_tile!(tyler::Map, tile)
     queue = tyler.tiles_being_added
     # NO need to start a need task!
     haskey(queue, tile) && return
-    queue[tile] = Threads.@spawn begin
-        try
-            img = fetch_tile(tyler, tile)
-            # we may have moved already and the tile doesn't need to be displayed anymore
-            if tile in tyler.displayed_tiles
-                put!(tyler.downloaded_tiles, (tile, img))
+    if length(queue) > tyler.max_parallel_downloads
+        # queue them for being downloaded once all other downloads are finished
+        # This helps not spamming the server and also gives a chance to delete
+        # the download request when e.g. zooming out really fast
+        push!(tyler.queued_but_not_downloaded, tile)
+    else
+        queue[tile] = @async try
+            # TODO, i think we should better check if we want to display this tile,
+            # even though we just scheduled it
+            if (tile in tyler.displayed_tiles)
+                img = fetch_tile(tyler, tile)
+                # we may have moved already and the tile doesn't need to be displayed anymore
+                if tile in tyler.displayed_tiles
+                    put!(tyler.downloaded_tiles, (tile, img))
+                end
             end
         catch e
-            @warn "error while downloading tile" exception = (e, Base.catch_backtrace())
+            if !(e isa InterruptException)
+                @warn "error while downloading tile" exception=e
+            end
+            # if the tile still needs to be displayed, reque it
+            # TODO should only retry for certain errors
+            if tile in tyler.displayed_tiles
+                @info("requeing after download error!")
+                delete!(queue, tile)
+                queue_tile!(tyler, tile)
+            end
         finally
             delete!(queue, tile)
         end
@@ -187,33 +242,59 @@ function Extents.extent(rect::Rect2)
     return Extent(X=(xmin, xmax), Y=(ymin, ymax))
 end
 
-function get_tiles(extent::Extent, crs, zoom::Int, min_tiles::Int, max_tiles::Int, tries=1)
+function get_tiles(extent::Extent, crs, zoom::Int, min_zoom::Int, max_zoom::Int, min_tiles::Int, max_tiles::Int, tries=1)
     new_tiles = MapTiles.TileGrid(extent, zoom, crs)
-    if zoom <= 1 || zoom >= 19 || tries > 10
+    if tries > 10
         return new_tiles, zoom
     end
+    # if zoom < min_zoom || zoom > max_zoom
+    #     zoom = clamp(zoom, min_zoom, max_zoom)
+    #     return get_tiles(extent, crs, zoom, min_zoom, max_zoom, min_tiles, max_tiles, tries + 1)
+    # end
     if length(new_tiles) > max_tiles
-        return get_tiles(extent, crs, max(zoom - 1, 1), min_tiles, max_tiles, tries + 1)
+        return get_tiles(extent, crs, max(zoom - 1, min_zoom), min_zoom, max_zoom, min_tiles, max_tiles, tries + 1)
     elseif length(new_tiles) <= min_tiles
-        return get_tiles(extent, crs, min(zoom + 1, 19), min_tiles, max_tiles, tries + 1)
+        return get_tiles(extent, crs, min(zoom + 1, max_zoom), min_zoom, max_zoom, min_tiles, max_tiles, tries + 1)
     end
     return new_tiles, zoom
 end
 
+max_zoom(tyler::Map) = Int(Providers.max_zoom(tyler.provider))
+min_zoom(tyler::Map) = Int(Providers.min_zoom(tyler.provider))
+
 function update_tiles!(tyler::Map, display_rect::Rect2)
     min_tiles = tyler.min_tiles
     max_tiles = tyler.max_tiles
-    new_tiles, new_zoom = get_tiles(extent(display_rect), tyler.coordinate_system, tyler.zoom[], min_tiles, max_tiles)
+    new_tiles, new_zoom = get_tiles(
+        extent(display_rect),
+        tyler.coordinate_system,
+        tyler.zoom[],
+        min_zoom(tyler), max_zoom(tyler),
+        min_tiles, max_tiles)
+
     tyler.zoom[] = new_zoom
-    new_tiles_set = Set(new_tiles)
+    new_tiles_set = Set{Tile}(new_tiles)
+    remove_tiles!(tyler, new_tiles_set)
+
     to_add = setdiff(new_tiles_set, tyler.displayed_tiles)
-    to_remove = setdiff(tyler.displayed_tiles, new_tiles_set)
-    remove_tiles!(tyler, to_remove)
+
     # replace
     empty!(tyler.displayed_tiles)
     union!(tyler.displayed_tiles, new_tiles_set)
+
     # Queue tiles to be downloaded & displayed
     foreach(tile -> queue_tile!(tyler, tile), to_add)
+end
+
+function debug_tile!(map::Tyler.Map, tile::Tile)
+    plot = linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1)
+    Tyler.place_tile!(tile, plot, web_mercator)
+end
+
+function debug_tiles!(map::Tyler.Map)
+    for tile in m.displayed_tiles
+        debug_tile!(m, tile)
+    end
 end
 
 end
