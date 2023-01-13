@@ -26,3 +26,6 @@ for (d, paths) in (("tutorial", srcsfiles),)
             documenter=true)
     end
 end
+
+#mkdir(joinpath(OUTPUT, "/UserGuide/data"))
+#cp(joinpath(@__DIR__, ".","examples/data/"), joinpath(OUTPUT, "/UserGuide/data"), force=true)

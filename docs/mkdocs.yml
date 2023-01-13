@@ -1,21 +1,21 @@
 theme:
   name: material
-  #logo: assets/view-grid-plus-outline.svg
+  logo: assets/icons8-green-earth-48.png
   features:
     # - announce.dismiss
-    - content.code.annotate
+    #- content.code.annotate
     # - content.tabs.link
-    - content.tooltips
+    #- content.tooltips
     # - header.autohide
     # - navigation.expand
-    - navigation.indexes
+    #- navigation.indexes
     # - navigation.instant
     # - navigation.prune
-    - navigation.sections
-    - navigation.tabs
+    #- navigation.sections
+    #- navigation.tabs
     # - navigation.tabs.sticky
     - navigation.top
-    - navigation.tracking
+    #- navigation.tracking
     - search.highlight
     - search.share
     - search.suggest
@@ -102,4 +102,5 @@ plugins:
 nav:
   - "Home": "index.md"
   - "User Guide":
-    - "Start" : "examples/generated/UserGuide/start.md"
+    - "Basic demo" : "examples/generated/UserGuide/start.md"
+    - "Whale shark trajectory" : "examples/generated/UserGuide/whale_ex.md"
