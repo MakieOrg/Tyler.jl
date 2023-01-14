@@ -104,3 +104,4 @@ nav:
   - "User Guide":
     - "Basic demo" : "examples/generated/UserGuide/start.md"
     - "Whale shark trajectory" : "examples/generated/UserGuide/whale_ex.md"
+    - "Map Tile providers" : "examples/generated/UserGuide/providers.md"
