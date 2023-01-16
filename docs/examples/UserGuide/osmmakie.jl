@@ -1,4 +1,4 @@
-using Tyler, GLMakie, OSMMakie, LightOSM
+using Tyler, GLMakie, OSMMakie, LightOSM, TileProviders
 
 area = (
     minlat = 51.50, minlon = -0.0921, # bottom left corner
