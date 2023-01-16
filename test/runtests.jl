@@ -32,8 +32,7 @@ buildings = buildings_from_file("london_buildings.osm");
 
 # Default
 london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
-m = Tyler.Map(london)
-
+m = wait(Tyler.Map(london)) # waits until all tiles are displayed
 # Nasa
 provider = TileProviders.NASAGIBS()
 m = Tyler.Map(Rect2f(0, 50, 40, 20), 5; provider=provider, min_tiles=8, max_tiles=32)
