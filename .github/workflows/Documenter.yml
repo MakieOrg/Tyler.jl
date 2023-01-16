@@ -14,6 +14,8 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-20.04
+    env:
+      DISPLAY: ':0'
     steps:
       - uses: actions/checkout@v2
       - uses: julia-actions/setup-julia@v1
@@ -23,7 +25,7 @@ jobs:
       - name: Install documentation dependencies
         run: sudo apt-get update && sudo apt-get install -y xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev
       - name: Install pkgs dependencies
-        run: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs -e 'using Pkg; pkg"add https://github.com/JuliaGeo/TileProviders.jl https://github.com/SimonDanisch/MapTiles.jl.git; dev ."; Pkg.instantiate()'
+        run: xvfb-run -s '-screen 0 1024x768x24' julia --project=docs -e 'using Pkg; pkg"add https://github.com/JuliaGeo/TileProviders.jl https://github.com/SimonDanisch/MapTiles.jl.git; dev ."; Pkg.instantiate()'
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # For authentication with GitHub Actions token
@@ -32,5 +34,5 @@ jobs:
           JULIA_DEBUG: "Documenter"
           DATADEPS_ALWAYS_ACCEPT: true
         run: |
-          DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --code-coverage=user --project=docs/ --color=yes docs/genfiles.jl
-          DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --code-coverage=user --project=docs/ --color=yes docs/make.jl
+          xvfb-run -s '-screen 0 1024x768x24' julia --code-coverage=user --project=docs/ --color=yes docs/genfiles.jl
+          xvfb-run -s '-screen 0 1024x768x24' julia --code-coverage=user --project=docs/ --color=yes docs/make.jl
