@@ -32,6 +32,7 @@ struct Map
     free_tiles::Vector{Makie.Combined}
     fetched_tiles::LRU{Tile,TileImage}
     max_parallel_downloads::Int
+    # TODO, use Channel here
     queued_but_not_downloaded::Set{Tile}
     tiles_being_added::ThreadSafeDict{Tile,Task}
     downloaded_tiles::Channel{Tuple{Tile,TileImage}}
@@ -59,7 +60,7 @@ end
 Base.showable(::MIME"image/png", ::Map) = true
 function Base.show(io::IO, m::MIME"image/png", map::Map)
     wait(map)
-    show(io, m, map.figure)
+    Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
 end
 
 function Map(rect::Rect, zoom=15, input_cs = wgs84;
@@ -120,6 +121,10 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
             tile, img = take!(downloaded_tiles)
             try
                 create_tile_plot!(tyler, tile, img)
+                # fixes on demand renderloop which doesn't pick up all updates!
+                if hasfield(typeof(tyler.screen), :requires_update)
+                    tyler.screen.requires_update = true
+                end
             catch e
                 @warn "error while creating tile" exception = (e, Base.catch_backtrace())
             end
