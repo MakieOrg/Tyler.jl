@@ -2,7 +2,7 @@
 
 [![Latest Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://makieorg.github.io/Tyler.jl/dev/)
 
-[Tyler](https://makieorg.github.io/Tyler.jl/dev/) is package for downloading map tiles on demand from different data source providers.
+[Tyler.jl](https://makieorg.github.io/Tyler.jl/dev/) is package for displaying tiled maps interactively, with [Makie.jl](https://github.com/MakieOrg/Makie.jl).
 
 Install like this until deps are registered:
 
