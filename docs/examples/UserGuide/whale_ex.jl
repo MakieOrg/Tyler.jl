@@ -31,7 +31,7 @@ provider = TileProviders.NASAGIBS(:ViirsEarthAtNight2012)
 
 set_theme!(theme_black())
 m = Tyler.Map(Rect2f(Rect2f(lomn - δlon/2, lamn-δlat/2, 2δlon, 2δlat)), 5;
-    provider, min_tiles=8, max_tiles=16)
+    provider, min_tiles=8, max_tiles=16, figure=Figure(resolution=(1000, 600)))
 wait(m)
 
 nt = 30
@@ -47,8 +47,6 @@ objline = lines!(m.axis, trail; color = trailcolor, linewidth=3)
 objscatter = scatter!(m.axis, whale; markersize = 15, color = :orangered,
     strokecolor=:grey90, strokewidth=1)
 hidedecorations!(m.axis)
-translate!(objline, 0, 0, 2)
-translate!(objscatter, 0, 0, 2)
 #limits!(ax, minimum(lon), maximum(lon), minimum(lat), maximum(lat))
 ## the animation is done by updating the Observable values
 ## change assets->(your folder) to make it work in your local env

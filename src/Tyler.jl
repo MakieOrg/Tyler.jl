@@ -32,6 +32,7 @@ struct Map
     free_tiles::Vector{Makie.Combined}
     fetched_tiles::LRU{Tile,TileImage}
     max_parallel_downloads::Int
+    # TODO, use Channel here
     queued_but_not_downloaded::Set{Tile}
     tiles_being_added::ThreadSafeDict{Tile,Task}
     downloaded_tiles::Channel{Tuple{Tile,TileImage}}
@@ -42,18 +43,27 @@ end
 
 # Wait for all tiles to be
 function Base.wait(map::Map)
-    while !isempty(map.tiles_being_added)
-        wait(last(first(map.tiles_being_added)))
+    while true
+        if !isempty(map.tiles_being_added)
+            wait(last(first(map.tiles_being_added)))
+        end
+        if !isempty(map.queued_but_not_downloaded)
+            sleep(0.001) # we don't have a task to wait on, so we sleep
+        end
+        # We're done if both are empty!
+        if isempty(map.tiles_being_added) && isempty(map.queued_but_not_downloaded)
+            return map
+        end
     end
 end
 
 Base.showable(::MIME"image/png", ::Map) = true
 function Base.show(io::IO, m::MIME"image/png", map::Map)
     wait(map)
-    show(io, m, map.figure)
+    Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
 end
 
-function Map(rect::Rect, zoom=3, input_cs = wgs84;
+function Map(rect::Rect, zoom=15, input_cs = wgs84;
         figure=Figure(resolution=(1500, 1500)),
         coordinate_system = MapTiles.web_mercator,
         provider=TileProviders.OpenStreetMap(:Mapnik),
@@ -61,13 +71,12 @@ function Map(rect::Rect, zoom=3, input_cs = wgs84;
         max_tiles=Makie.automatic,
         max_parallel_downloads = 16,
         cache_size_gb=5)
-    ext = extent(rect)
-    tiles = MapTiles.TileGrid(ext, zoom, input_cs)
+
     fetched_tiles = LRU{Tile, Matrix{RGB{N0f8}}}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
     free_tiles = Makie.Combined[]
     tiles_being_added = ThreadSafeDict{Tile,Task}()
     downloaded_tiles = Channel{Tuple{Tile,TileImage}}(128)
-    screen = display(figure)
+    screen = display(figure; title="Tyler (with Makie)")
     if isnothing(screen)
         error("please load either GLMakie, WGLMakie or CairoMakie")
     end
@@ -80,6 +89,7 @@ function Map(rect::Rect, zoom=3, input_cs = wgs84;
     if !(max_tiles isa Int)
         max_tiles = nx * ny
     end
+    ext = Extents.extent(rect)
     ext_target = MapTiles.project_extent(ext, input_cs, coordinate_system)
     X = ext_target.X
     Y = ext_target.Y
@@ -88,7 +98,7 @@ function Map(rect::Rect, zoom=3, input_cs = wgs84;
     tyler = Map(
         provider, coordinate_system,
         min_tiles, max_tiles, Observable(zoom),
-        figure, axis, Set(tiles), plots, free_tiles,
+        figure, axis, Set{Tile}(), plots, free_tiles,
         fetched_tiles,
         max_parallel_downloads, Set{Tile}(),
         tiles_being_added, downloaded_tiles,
@@ -102,6 +112,8 @@ function Map(rect::Rect, zoom=3, input_cs = wgs84;
             end
             sleep(0.01)
         end
+        empty!(tyler.queued_but_not_downloaded)
+        empty!(tyler.displayed_tiles)
     end
     #
     display_task[] = @async begin
@@ -109,6 +121,10 @@ function Map(rect::Rect, zoom=3, input_cs = wgs84;
             tile, img = take!(downloaded_tiles)
             try
                 create_tile_plot!(tyler, tile, img)
+                # fixes on demand renderloop which doesn't pick up all updates!
+                if hasfield(typeof(tyler.screen), :requires_update)
+                    tyler.screen.requires_update = true
+                end
             catch e
                 @warn "error while creating tile" exception = (e, Base.catch_backtrace())
             end
@@ -116,10 +132,11 @@ function Map(rect::Rect, zoom=3, input_cs = wgs84;
     end
 
     # Queue tiles to be downloaded & displayed
-    foreach(tile -> queue_tile!(tyler, tile), tiles)
+    update_tiles!(tyler, ext_target)
 
     on(axis.finallimits) do rect
-        update_tiles!(tyler, rect)
+        isopen(screen) || return
+        update_tiles!(tyler, Extents.extent(rect))
         return
     end
     return tyler
@@ -170,7 +187,7 @@ function place_tile!(tile::Tile, plot, coordinate_system)
     bounds = MapTiles.extent(tile, coordinate_system)
     xmin, xmax = bounds.X
     ymin, ymax = bounds.Y
-    translate!(plot, xmin, ymin, tile.z)
+    translate!(plot, xmin, ymin, tile.z - 100)
     scale!(plot, xmax - xmin, ymax - ymin, 0)
     return
 end
@@ -259,11 +276,11 @@ end
 max_zoom(tyler::Map) = Int(Providers.max_zoom(tyler.provider))
 min_zoom(tyler::Map) = Int(Providers.min_zoom(tyler.provider))
 
-function update_tiles!(tyler::Map, display_rect::Rect2)
+function update_tiles!(tyler::Map, area::Extent)
     min_tiles = tyler.min_tiles
     max_tiles = tyler.max_tiles
     new_tiles, new_zoom = get_tiles(
-        extent(display_rect),
+        area,
         tyler.coordinate_system,
         tyler.zoom[],
         min_zoom(tyler), max_zoom(tyler),

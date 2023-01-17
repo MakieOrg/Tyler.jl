@@ -1,9 +1,6 @@
 using Documenter, DocumenterMarkdown
 using Tyler, MapTiles, GLMakie, TileProviders
 
-deployconfig = Documenter.auto_detect_deploy_system()
-Documenter.post_status(deployconfig; type="pending", repo="https://github.com/MakieOrg/Tyler.jl.git")
-
 makedocs(
     modules=[Tyler],
     clean=true,
