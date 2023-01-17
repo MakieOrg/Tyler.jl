@@ -12,6 +12,7 @@ using GeometryBasics: GLTriangleFace, decompose_uv
 using Extents
 using GeoInterface
 using ThreadSafeDicts
+using OrderedCollections
 using HTTP
 using ImageMagick
 
@@ -25,18 +26,20 @@ struct Map
     zoom::Observable{Int}
     figure::Figure
     axis::Axis
-    displayed_tiles::Set{Tile}
+    displayed_tiles::OrderedSet{Tile}
     plots::Dict{Tile,Any}
     free_tiles::Vector{Makie.Combined}
     fetched_tiles::LRU{Tile,TileImage}
     max_parallel_downloads::Int
     # TODO, use Channel here
-    queued_but_not_downloaded::Set{Tile}
+    queued_but_not_downloaded::OrderedSet{Tile}
     tiles_being_added::ThreadSafeDict{Tile,Task}
     downloaded_tiles::Channel{Tuple{Tile,TileImage}}
     display_task::Base.RefValue{Task}
     download_task::Base.RefValue{Task}
     screen::Makie.MakieScreen
+    depth::Int
+    halo::Float64
 end
 
 # Wait for all tiles to be
@@ -68,7 +71,9 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
         min_tiles=Makie.automatic,
         max_tiles=Makie.automatic,
         max_parallel_downloads = 16,
-        cache_size_gb=5)
+        cache_size_gb=5,
+        depth=8, halo=0.5
+       )
 
     fetched_tiles = LRU{Tile, Matrix{RGB{N0f8}}}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
     free_tiles = Makie.Combined[]
@@ -96,17 +101,18 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
     tyler = Map(
         provider, coordinate_system,
         min_tiles, max_tiles, Observable(zoom),
-        figure, axis, Set{Tile}(), plots, free_tiles,
+        figure, axis, OrderedSet{Tile}(), plots, free_tiles,
         fetched_tiles,
-        max_parallel_downloads, Set{Tile}(),
+        max_parallel_downloads, OrderedSet{Tile}(),
         tiles_being_added, downloaded_tiles,
-        display_task, download_task, screen
+        display_task, download_task, screen,
+        depth, halo,
     )
     download_task[] = @async begin
         while isopen(screen)
             # we dont download all tiles at once, so when one download task finishes, we may want to schedule more downloads:
             if !isempty(tyler.queued_but_not_downloaded)
-                queue_tile!(tyler, pop!(tyler.queued_but_not_downloaded))
+                queue_tile!(tyler, popfirst!(tyler.queued_but_not_downloaded))
             end
             sleep(0.01)
         end
@@ -151,7 +157,7 @@ function stop_download!(map::Map, tile::Tile)
     # end
 end
 
-function remove_tiles!(map::Map, tiles_being_displayed::Set{Tile})
+function remove_tiles!(map::Map, tiles_being_displayed::OrderedSet{Tile})
     to_remove_plots = setdiff(keys(map.plots), tiles_being_displayed)
     for tile in to_remove_plots
         if haskey(map.plots, tile)
@@ -200,8 +206,8 @@ function create_tile_plot!(tyler::Map, tile::Tile, image::TileImage)
         mplot = create_tileplot!(tyler.axis, image)
     else
         mplot = pop!(tyler.free_tiles)
-        mplot.visible = true
         mplot.color[] = image
+        mplot.visible = true
     end
     tyler.plots[tile] = mplot
     place_tile!(tile, mplot, tyler.coordinate_system)
@@ -209,7 +215,8 @@ end
 
 function fetch_tile(tyler::Map, tile::Tile)
     return get!(tyler.fetched_tiles, tile) do
-        url = geturl(tyler.provider, tile.x, tile.y, tile.z)
+        url = TileProviders.geturl(tyler.provider, tile.x, tile.y, tile.z)
+        @show url
         result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
         return ImageMagick.readblob(result.body)
     end
@@ -276,15 +283,30 @@ TileProviders.min_zoom(tyler::Map) = Int(min_zoom(tyler.provider))
 function update_tiles!(tyler::Map, area::Extent)
     min_tiles = tyler.min_tiles
     max_tiles = tyler.max_tiles
-    new_tiles, new_zoom = get_tiles(
-        area,
-        tyler.coordinate_system,
-        tyler.zoom[],
-        min_zoom(tyler), max_zoom(tyler),
-        min_tiles, max_tiles)
+    # `depth` determines the number of layers below the current
+    # layer to load. Tiles are downloaded in order from lowest to highest zoom.
+    depth = tyler.depth
 
-    tyler.zoom[] = new_zoom
-    new_tiles_set = Set{Tile}(new_tiles)
+    # Calculate the zoom level
+    zoom = clamp(z_index(area, (X=1000, Y=1000), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
+    tyler.zoom[] = zoom
+    # And the z layers we will plot
+    layer_range = max(min_zoom(tyler), zoom - depth):zoom
+    # Define a halo around the area to download last, so pan/zoom are filled already
+    halo_area = grow(area, tyler.halo + 1) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
+    # Define all the tiles
+    area_layers = [MapTiles.TileGrid(area, z, tyler.coordinate_system) for z in layer_range]
+    halo_layers = [MapTiles.TileGrid(halo_area, z, tyler.coordinate_system) for z in layer_range]
+
+    # Create the full set of tiles
+    # Using an ordered set gives a smoother load than a Set
+    new_tiles_set = OrderedSet{Tile}(
+        Iterators.flatten((
+            Iterators.flatten(area_layers), # Visible layers load first, from lowest zoom to highest
+            Iterators.flatten(halo_layers), # Halo loads last
+        ))
+    )
+    # Remove any tiles not in the new set
     remove_tiles!(tyler, new_tiles_set)
 
     to_add = setdiff(new_tiles_set, tyler.displayed_tiles)
@@ -295,6 +317,24 @@ function update_tiles!(tyler::Map, area::Extent)
 
     # Queue tiles to be downloaded & displayed
     foreach(tile -> queue_tile!(tyler, tile), to_add)
+end
+
+function z_index(extent::Extent, res::NamedTuple, crs::MapTiles.WebMercator)
+    ntiles = map(r -> r / 256, res)
+    tile_size_X = (extent.X[2] - extent.X[1]) / ntiles.X 
+    tile_size_Y = (extent.Y[2] - extent.Y[1]) / ntiles.Y 
+    tile_size = (tile_size_X + tile_size_Y) / 2
+    z = log2(MapTiles.CE / tile_size)
+    return round(Int, z)
+end
+
+# grow an extent
+function grow(area::Extent, factor)
+    map(Extents.bounds(area)) do axis_bounds
+        span = axis_bounds[2] - axis_bounds[1]
+        pad = factor * span / 2
+        (axis_bounds[1] - pad, axis_bounds[2] + pad)
+    end |> Extent
 end
 
 function debug_tile!(map::Tyler.Map, tile::Tile)
