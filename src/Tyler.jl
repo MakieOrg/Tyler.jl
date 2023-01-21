@@ -2,15 +2,13 @@ module Tyler
 
 using Makie
 using LinearAlgebra
-using MapTiles
-using MapTiles: Tile, TileGrid, web_mercator, wgs84
+using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
 using TileProviders: TileProviders, AbstractProvider, Provider
 using Colors
 using Colors: N0f8
 using LRUCache
 using GeometryBasics
 using GeometryBasics: GLTriangleFace, decompose_uv
-using MapTiles.GeoFormatTypes: CoordinateReferenceSystemFormat
 using Extents
 using GeoInterface
 using ThreadSafeDicts
