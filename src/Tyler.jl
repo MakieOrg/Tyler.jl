@@ -224,9 +224,9 @@ function fetch_tile(tyler::Map, tile::Tile)
             result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
             return ImageMagick.readblob(result.body)
         elseif isa(tyler.provider,Interpolator)
-            itp=tyler.provider
+            itp=tyler.provider.url
             (lon,lat) = tile2positions(tile)
-            z = permutedims(itp.url.(lon,-lat))
+            z = permutedims(itp.(lon,lat))
             return [col(i) for i in z]
         else
             error("unknown provider type")
