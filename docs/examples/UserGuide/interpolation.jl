@@ -1,7 +1,5 @@
 # # Using Interpolation On The Fly
 
-# ## A basic request
-
 using Tyler, GLMakie
 using Interpolations: interpolate, Gridded, Linear
 

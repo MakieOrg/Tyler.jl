@@ -227,6 +227,7 @@ function fetch_tile(tyler::Map, tile::Tile)
     else
         error("unknown provider type")
     end
+    end
 end
 
 function queue_tile!(tyler::Map, tile)
