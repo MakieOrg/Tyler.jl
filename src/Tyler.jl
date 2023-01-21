@@ -17,6 +17,9 @@ using ThreadSafeDicts
 using HTTP
 using ImageMagick
 
+include("for_interpolations.jl")
+using Tyler.ForInterpolations: tile2positions, Interpolator
+
 const TileImage = Matrix{RGB{N0f8}}
 
 struct Map
@@ -209,14 +212,29 @@ function create_tile_plot!(tyler::Map, tile::Tile, image::TileImage)
     place_tile!(tile, mplot, tyler.coordinate_system)
 end
 
+cols=to_colormap(:thermal)
+col(i)=RGBAf(Makie.interpolated_getindex(cols,i))
+
 function fetch_tile(tyler::Map, tile::Tile)
     return get!(tyler.fetched_tiles, tile) do
-        # TODO refactor fetch_tile in MapProvider to allow passing these parameters
-        url = Providers.geturl(tyler.provider, tile)
-        result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
-        return ImageMagick.readblob(result.body)
+        if isa(tyler.provider,Provider)
+            # TODO refactor fetch_tile in MapProvider to allow passing these parameters
+#        url = Providers.geturl(tyler.provider, Tile(16375, 10895, 15))
+            url = Providers.geturl(tyler.provider, tile)
+            result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
+            return ImageMagick.readblob(result.body)
+        elseif isa(tyler.provider,Interpolator)
+            itp=tyler.provider
+            (lon,lat) = tile2positions(tile)
+            z = permutedims(itp.url.(lon,-lat))
+            return [col(i) for i in z]
+        else
+            error("unknown provider type")
+        end
     end
 end
+
+##
 
 function queue_tile!(tyler::Map, tile)
     queue = tyler.tiles_being_added
