@@ -20,7 +20,7 @@ module ForInterpolations
     end
 
     struct Interpolator <: AbstractProvider
-        url::Interpolations.GriddedInterpolation
+        url::Union{Function,Interpolations.GriddedInterpolation}
         options::Dict{Symbol,Any}
     end
 
