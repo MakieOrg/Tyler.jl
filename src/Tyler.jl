@@ -65,7 +65,8 @@ function Base.show(io::IO, m::MIME"image/png", map::Map)
 end
 
 function Map(rect::Rect, zoom=15, input_cs = wgs84;
-        figure=Figure(resolution=(1500, 1500)),
+        resolution=(1000, 1000),
+        figure=Figure(; resolution),
         coordinate_system = MapTiles.web_mercator,
         provider=TileProviders.OpenStreetMap(:Mapnik),
         min_tiles=Makie.automatic,
@@ -287,8 +288,10 @@ function update_tiles!(tyler::Map, area::Extent)
     # layer to load. Tiles are downloaded in order from lowest to highest zoom.
     depth = tyler.depth
 
+    res = tyler.figure.scene.theme.resolution.val
+    @show res
     # Calculate the zoom level
-    zoom = clamp(z_index(area, (X=1000, Y=1000), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
+    zoom = clamp(z_index(area, (X=res[2], Y=res[1]), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
     tyler.zoom[] = zoom
     # And the z layers we will plot
     layer_range = max(min_zoom(tyler), zoom - depth):zoom
