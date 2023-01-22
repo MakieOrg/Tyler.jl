@@ -2,15 +2,13 @@ module Tyler
 
 using Makie
 using LinearAlgebra
-using MapTiles
-using MapTiles: Tile, TileGrid, web_mercator, wgs84
-using TileProviders: TileProviders, AbstractProvider, Provider
+using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
+using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
 using Colors
 using Colors: N0f8
 using LRUCache
 using GeometryBasics
 using GeometryBasics: GLTriangleFace, decompose_uv
-using MapTiles.GeoFormatTypes: CoordinateReferenceSystemFormat
 using Extents
 using GeoInterface
 using ThreadSafeDicts
@@ -27,7 +25,7 @@ struct Map
     zoom::Observable{Int}
     figure::Figure
     axis::Axis
-    displayed_tiles::Set{MapTiles.Tile}
+    displayed_tiles::Set{Tile}
     plots::Dict{Tile,Any}
     free_tiles::Vector{Makie.Combined}
     fetched_tiles::LRU{Tile,TileImage}
@@ -211,8 +209,7 @@ end
 
 function fetch_tile(tyler::Map, tile::Tile)
     return get!(tyler.fetched_tiles, tile) do
-        # TODO refactor fetch_tile in MapProvider to allow passing these parameters
-        url = Providers.geturl(tyler.provider, tile)
+        url = geturl(tyler.provider, tile.x, tile.y, tile.z)
         result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
         return ImageMagick.readblob(result.body)
     end
@@ -261,7 +258,7 @@ function Extents.extent(rect::Rect2)
 end
 
 function get_tiles(extent::Extent, crs, zoom::Int, min_zoom::Int, max_zoom::Int, min_tiles::Int, max_tiles::Int, tries=1)
-    new_tiles = MapTiles.TileGrid(extent, zoom, crs)
+    new_tiles = TileGrid(extent, zoom, crs)
     if tries > 10
         return new_tiles, zoom
     end
@@ -273,8 +270,8 @@ function get_tiles(extent::Extent, crs, zoom::Int, min_zoom::Int, max_zoom::Int,
     return new_tiles, zoom
 end
 
-max_zoom(tyler::Map) = Int(Providers.max_zoom(tyler.provider))
-min_zoom(tyler::Map) = Int(Providers.min_zoom(tyler.provider))
+TileProviders.max_zoom(tyler::Map) = Int(max_zoom(tyler.provider))
+TileProviders.min_zoom(tyler::Map) = Int(min_zoom(tyler.provider))
 
 function update_tiles!(tyler::Map, area::Extent)
     min_tiles = tyler.min_tiles
