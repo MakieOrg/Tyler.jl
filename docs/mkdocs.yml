@@ -106,3 +106,5 @@ nav:
     - "Whale shark trajectory" : "examples/generated/UserGuide/whale_ex.md"
     - "Map Tile providers" : "examples/generated/UserGuide/providers.md"
     - "OSMMakie integration" : "examples/generated/UserGuide/osmmakie.md"
+    - "On The Fly Interpolation" : "examples/generated/UserGuide/interpolation.md" 
+
