@@ -217,7 +217,6 @@ end
 function fetch_tile(tyler::Map, tile::Tile)
     return get!(tyler.fetched_tiles, tile) do
         url = TileProviders.geturl(tyler.provider, tile.x, tile.y, tile.z)
-        @show url
         result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
         return ImageMagick.readblob(result.body)
     end
@@ -289,7 +288,6 @@ function update_tiles!(tyler::Map, area::Extent)
     depth = tyler.depth
 
     res = tyler.figure.scene.theme.resolution.val
-    @show res
     # Calculate the zoom level
     zoom = clamp(z_index(area, (X=res[2], Y=res[1]), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
     tyler.zoom[] = zoom
