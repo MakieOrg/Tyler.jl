@@ -4,7 +4,7 @@ using GLMakie
 
 # Default
 london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
-m = wait(Tyler.Map(london; halo=0.0, depth=4)) # waits until all tiles are displayed
+m = wait(Tyler.Map(london; halo=0.0, depth=0)) # waits until all tiles are displayed
 @test isempty(m.tiles_being_added)
 @test isempty(m.queued_but_not_downloaded)
 @test length(m.displayed_tiles) == 162
