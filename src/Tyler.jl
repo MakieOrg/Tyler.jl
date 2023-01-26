@@ -307,6 +307,7 @@ function update_tiles!(tyler::Map, area::Extent)
             # Iterators.flatten(halo_layers), # Halo loads last
         ))
     )
+    @show length(new_tiles_set)
     # Remove any tiles not in the new set
     remove_tiles!(tyler, new_tiles_set)
 
