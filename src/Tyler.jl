@@ -217,7 +217,7 @@ end
 function fetch_tile(tyler::Map, tile::Tile)
     return get!(tyler.fetched_tiles, tile) do
         url = TileProviders.geturl(tyler.provider, tile.x, tile.y, tile.z)
-        result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
+        result = HTTP.get(url; retry=true, readtimeout=1, connect_timeout=1)
         return ImageMagick.readblob(result.body)
     end
 end
@@ -294,7 +294,7 @@ function update_tiles!(tyler::Map, area::Extent)
     # And the z layers we will plot
     layer_range = max(min_zoom(tyler), zoom - depth):zoom
     # Define a halo around the area to download last, so pan/zoom are filled already
-    halo_area = grow(area, tyler.halo + 1) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
+    halo_area = grow(area, tyler.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
     # Define all the tiles
     area_layers = [MapTiles.TileGrid(area, z, tyler.coordinate_system) for z in layer_range]
     halo_layers = [MapTiles.TileGrid(halo_area, z, tyler.coordinate_system) for z in layer_range]
@@ -304,7 +304,7 @@ function update_tiles!(tyler::Map, area::Extent)
     new_tiles_set = OrderedSet{Tile}(
         Iterators.flatten((
             Iterators.flatten(area_layers), # Visible layers load first, from lowest zoom to highest
-            Iterators.flatten(halo_layers), # Halo loads last
+            # Iterators.flatten(halo_layers), # Halo loads last
         ))
     )
     # Remove any tiles not in the new set
