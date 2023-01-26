@@ -73,7 +73,7 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
         max_tiles=Makie.automatic,
         max_parallel_downloads = 16,
         cache_size_gb=5,
-        depth=8, halo=0.5
+        depth=8, halo=0.3
        )
 
     fetched_tiles = LRU{Tile, Matrix{RGB{N0f8}}}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
@@ -307,7 +307,6 @@ function update_tiles!(tyler::Map, area::Extent)
             # Iterators.flatten(halo_layers), # Halo loads last
         ))
     )
-    @show length(new_tiles_set)
     # Remove any tiles not in the new set
     remove_tiles!(tyler, new_tiles_set)
 
