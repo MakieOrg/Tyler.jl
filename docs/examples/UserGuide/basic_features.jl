@@ -1,4 +1,4 @@
-# # Basic feature exampe
+# # Basic features example
 
 # ## Add points, polygons and text to a map
 
@@ -28,7 +28,11 @@ frame = Rect2f(lon - delta/2, lat-delta/2, delta, delta)
 # show map
 m = Tyler.Map(frame;
     provider, min_tiles=8, max_tiles=16, figure=Figure(resolution=(1000, 600)))
-    
+
+# wait for tiles to fully load
+wait(m)    
+
+# plot point on map
 objscatter = scatter!(m.axis, pts; color = :red, marker = '⭐', markersize = 50)
 
 # hide ticks, grid and lables
@@ -50,3 +54,6 @@ poly!(polyg, color = :transparent, strokecolor = :black, strokewidth = 5)
 ## Add text
 pts2 = Point2f(MapTiles.project((lon,lat-delta/6), MapTiles.wgs84, MapTiles.web_mercator))
 text!(pts2, text = "Basic Example", fontsize = 30, color = :darkblue, align = (:center, :center))
+
+# show figure
+m
