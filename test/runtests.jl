@@ -1,6 +1,7 @@
 using Test
 using Tyler
 using GLMakie
+using Extents
 
 # Default
 london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
