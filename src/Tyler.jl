@@ -331,6 +331,15 @@ function z_index(extent::Extent, res::NamedTuple, crs::MapTiles.WebMercator)
     z = log2(MapTiles.CE / tile_size)
     return round(Int, z)
 end
+function z_index(extent::Extent, res::NamedTuple, crs::MapTiles.WGS84)
+    # Calculate the number of tiles at each z and get the one just better
+    # than what we need for resolution `res`
+    target_ntiles = prod(map(r -> r / 256, res))
+    tiles_at_z = map(1:24) do z
+        z => length(TileGrid(extent, z, crs))
+    end
+    return searchsortedfirst(tiles_at_z, target_ntiles; by=last)[1]
+end
 
 # grow an extent
 function grow(area::Extent, factor)
