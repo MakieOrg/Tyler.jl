@@ -217,7 +217,7 @@ end
 function fetch_tile(tyler::Map, tile::Tile)
     return get!(tyler.fetched_tiles, tile) do
         url = TileProviders.geturl(tyler.provider, tile.x, tile.y, tile.z)
-        result = HTTP.get(url; retry=true, readtimeout=1, connect_timeout=1)
+        result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
         return ImageMagick.readblob(result.body)
     end
 end
@@ -294,18 +294,19 @@ function update_tiles!(tyler::Map, area::Extent)
     # And the z layers we will plot
     layer_range = max(min_zoom(tyler), zoom - depth):zoom
     # Define a halo around the area to download last, so pan/zoom are filled already
+    middle_area = grow(area, -0.5) # Download the middle first
     halo_area = grow(area, tyler.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
     # Define all the tiles
-    area_layers = [MapTiles.TileGrid(area, z, tyler.coordinate_system) for z in layer_range]
-    halo_layers = [MapTiles.TileGrid(halo_area, z, tyler.coordinate_system) for z in layer_range]
+    area_layers = [SpiralIterator2(MapTiles.TileGrid(area, z, tyler.coordinate_system)) for z in layer_range]
+    halo_layers = [SpiralIterator2(MapTiles.TileGrid(halo_area, z, tyler.coordinate_system)) for z in layer_range]
 
     # Create the full set of tiles
     # Using an ordered set gives a smoother load than a Set
     new_tiles_set = OrderedSet{Tile}(
-        Iterators.flatten((
-            Iterators.flatten(area_layers), # Visible layers load first, from lowest zoom to highest
-            Iterators.flatten(halo_layers), # Halo loads last
-        ))
+        Iterators.flatten(
+            (Iterators.flatten(area_layers), # Visible layers load first, from lowest zoom to highest
+             Iterators.flatten(halo_layers),) # Halo loads last 
+        )
     )
     # Remove any tiles not in the new set
     remove_tiles!(tyler, new_tiles_set)
@@ -320,6 +321,8 @@ function update_tiles!(tyler::Map, area::Extent)
     foreach(tile -> queue_tile!(tyler, tile), to_add)
 end
 
+# Get z from the size of the extent and screen resolution
+# This fixes z so its the same zooming in or out
 function z_index(extent::Extent, res::NamedTuple, crs::MapTiles.WebMercator)
     ntiles = map(r -> r / 256, res)
     tile_size_X = (extent.X[2] - extent.X[1]) / ntiles.X 
@@ -349,4 +352,64 @@ function debug_tiles!(map::Tyler.Map)
     end
 end
 
+
+# Load tiles from the center out, rather than top to bottom
+# This gives the feeling of faster load time because the
+# tiles you look at most are loaded first.
+#
+# It would be even better to start the spiral at the
+# mouse cursor tile, for corner zooms.
+struct SpiralIterator2
+    tiles::TileGrid
+    indices::Vector{CartesianIndex{2}}
 end
+function SpiralIterator2(tiles::MapTiles.TileGrid; start=CartesianIndex(size(tiles) .÷ 2))
+    if length(tiles) <= 5
+        indices = vec(CartesianIndices(tiles.grid))
+        @assert length(indices) == length(tiles)
+        return SpiralIterator2(tiles, indices)
+    end
+
+    n = max(size(tiles.grid)...)
+    idx_delta = Iterators.cycle([CartesianIndex(-1, 0), CartesianIndex(0, -1), CartesianIndex(1, 0), CartesianIndex(0, 1)])
+    (Δidx, Δidx_state) = iterate(idx_delta) 
+    len_delta = Iterators.cycle([0, 1])
+    (Δlen, Δlen_state) = iterate(len_delta)
+    len = 0
+    # Start in the middle
+    idx = start
+    i = 1
+    indices = [idx]
+    while i <= (2n)^2
+        for _ in 1:len
+            idx += Δidx
+            i += 1
+            if checkbounds(Bool, tiles.grid, idx)
+                push!(indices, idx)
+            end
+        end
+        len += Δlen
+        (Δidx, Δidx_state) = iterate(idx_delta, Δidx_state)
+        (Δlen, Δlen_state) = iterate(len_delta, Δlen_state)
+    end
+    @assert length(indices) == length(tiles)
+    return SpiralIterator2(tiles, indices)
+end
+
+Base.length(spiral::SpiralIterator2) = length(spiral.tiles)
+Base.size(spiral::SpiralIterator2, dims...) = size(spiral.tiles, dims...)
+Base.getindex(spiral::SpiralIterator2, i) = getindex(spiral.tiles, spiral.indices[i])
+Base.firstindex(spiral::SpiralIterator2) = firstindex(spiral.tiles)
+Base.lastindex(spiral::SpiralIterator2) = lastindex(spiral.tiles)
+
+function Base.iterate(spiral::SpiralIterator2, state=1)
+    if state > length(spiral)
+        nothing
+    else
+        (spiral[state], state+1)
+    end
+end
+
+
+end
+
