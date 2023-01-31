@@ -21,8 +21,6 @@ const TileImage = Matrix{RGB{N0f8}}
 struct Map
     provider::AbstractProvider
     coordinate_system::CoordinateReferenceSystemFormat
-    min_tiles::Int
-    max_tiles::Int
     zoom::Observable{Int}
     figure::Figure
     axis::Axis
@@ -64,13 +62,11 @@ function Base.show(io::IO, m::MIME"image/png", map::Map)
     Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
 end
 
-function Map(rect::Rect, zoom=15, input_cs = wgs84;
+function Map(rect::Rect, input_cs=wgs84;
         resolution=(1000, 1000),
         figure=Figure(; resolution),
         coordinate_system = MapTiles.web_mercator,
         provider=TileProviders.OpenStreetMap(:Mapnik),
-        min_tiles=Makie.automatic,
-        max_tiles=Makie.automatic,
         max_parallel_downloads = 16,
         cache_size_gb=5,
         depth=8, halo=0.2
@@ -87,12 +83,6 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
     display_task = Base.RefValue{Task}()
     nx, ny = cld.(size(screen), 256)
     download_task = Base.RefValue{Task}()
-    if !(min_tiles isa Int)
-        min_tiles = fld(nx, 2) * fld(ny, 2)
-    end
-    if !(max_tiles isa Int)
-        max_tiles = nx * ny
-    end
     ext = Extents.extent(rect)
     ext_target = MapTiles.project_extent(ext, input_cs, coordinate_system)
     X = ext_target.X
@@ -101,7 +91,7 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
     plots = Dict{Tile,Any}()
     tyler = Map(
         provider, coordinate_system,
-        min_tiles, max_tiles, Observable(zoom),
+        Observable(1),
         figure, axis, OrderedSet{Tile}(), plots, free_tiles,
         fetched_tiles,
         max_parallel_downloads, OrderedSet{Tile}(),
@@ -109,6 +99,7 @@ function Map(rect::Rect, zoom=15, input_cs = wgs84;
         display_task, download_task, screen,
         depth, halo,
     )
+    tyler.zoom[] = get_zoom(tyler, ext)
     download_task[] = @async begin
         while isopen(screen)
             # we dont download all tiles at once, so when one download task finishes, we may want to schedule more downloads:
@@ -264,32 +255,21 @@ function Extents.extent(rect::Rect2)
     return Extent(X=(xmin, xmax), Y=(ymin, ymax))
 end
 
-function get_tiles(extent::Extent, crs, zoom::Int, min_zoom::Int, max_zoom::Int, min_tiles::Int, max_tiles::Int, tries=1)
-    new_tiles = TileGrid(extent, zoom, crs)
-    if tries > 10
-        return new_tiles, zoom
-    end
-    if length(new_tiles) > max_tiles
-        return get_tiles(extent, crs, max(zoom - 1, min_zoom), min_zoom, max_zoom, min_tiles, max_tiles, tries + 1)
-    elseif length(new_tiles) <= min_tiles
-        return get_tiles(extent, crs, min(zoom + 1, max_zoom), min_zoom, max_zoom, min_tiles, max_tiles, tries + 1)
-    end
-    return new_tiles, zoom
-end
-
 TileProviders.max_zoom(tyler::Map) = Int(max_zoom(tyler.provider))
 TileProviders.min_zoom(tyler::Map) = Int(min_zoom(tyler.provider))
 
+function get_zoom(tyler::Map, area) 
+    res = tyler.figure.scene.theme.resolution.val
+    clamp(z_index(area, (X=res[2], Y=res[1]), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
+end
+
 function update_tiles!(tyler::Map, area::Extent)
-    min_tiles = tyler.min_tiles
-    max_tiles = tyler.max_tiles
     # `depth` determines the number of layers below the current
     # layer to load. Tiles are downloaded in order from lowest to highest zoom.
     depth = tyler.depth
 
-    res = tyler.figure.scene.theme.resolution.val
     # Calculate the zoom level
-    zoom = clamp(z_index(area, (X=res[2], Y=res[1]), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
+    zoom = get_zoom(tyler, area)
     tyler.zoom[] = zoom
     # And the z layers we will plot
     layer_range = max(min_zoom(tyler), zoom - depth):zoom

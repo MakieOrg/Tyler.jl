@@ -20,12 +20,7 @@ delta = 1;
 ## create rectangle for display extents in web_mercator
 frame = Rect2f(lon - delta/2, lat-delta/2, delta, delta)
 ## show map
-m = Tyler.Map(frame;
-    provider, min_tiles=8, max_tiles=16,
-    figure=Figure(resolution=(1000, 600))
-    )
-## wait for tiles to fully load
-wait(m)
+m = Tyler.Map(frame; provider, figure=Figure(resolution=(1000, 600)))
 
 # Plot point on map
 
@@ -50,5 +45,4 @@ pts2 = Point2f(MapTiles.project((lon,lat-delta/6), MapTiles.wgs84, MapTiles.web_
 text!(pts2, text = "Basic Example"; fontsize = 30,
     color = :darkblue, align = (:center, :center)
     )
-## show figure
 m
