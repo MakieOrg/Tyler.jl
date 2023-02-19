@@ -38,6 +38,7 @@ struct Map
     screen::Makie.MakieScreen
     depth::Int
     halo::Float64
+    scale::Float64
 end
 
 # Wait for all tiles to be
@@ -69,7 +70,7 @@ function Map(rect::Rect, input_cs=wgs84;
         provider=TileProviders.OpenStreetMap(:Mapnik),
         max_parallel_downloads = 16,
         cache_size_gb=5,
-        depth=8, halo=0.2
+        depth=8, halo=0.2, scale=1.0
        )
 
     fetched_tiles = LRU{Tile, Matrix{RGB{N0f8}}}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
@@ -97,7 +98,7 @@ function Map(rect::Rect, input_cs=wgs84;
         max_parallel_downloads, OrderedSet{Tile}(),
         tiles_being_added, downloaded_tiles,
         display_task, download_task, screen,
-        depth, halo,
+        depth, halo, scale
     )
     tyler.zoom[] = get_zoom(tyler, ext)
     download_task[] = @async begin
@@ -259,7 +260,7 @@ TileProviders.max_zoom(tyler::Map) = Int(max_zoom(tyler.provider))
 TileProviders.min_zoom(tyler::Map) = Int(min_zoom(tyler.provider))
 
 function get_zoom(tyler::Map, area) 
-    res = tyler.figure.scene.theme.resolution.val
+    res = tyler.figure.scene.theme.resolution.val .* tyler.scale
     clamp(z_index(area, (X=res[2], Y=res[1]), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
 end
 
@@ -311,13 +312,13 @@ function z_index(extent::Extent, res::NamedTuple, crs::MapTiles.WebMercator)
     return round(Int, z)
 end
 function z_index(extent::Extent, res::NamedTuple, crs::MapTiles.WGS84)
-    # Calculate the number of tiles at each z and get the one just better
-    # than what we need for resolution `res`
+    # Calculate the number of tiles at each z and get the one 
+    # closest to the resolution `res`
     target_ntiles = prod(map(r -> r / 256, res))
     tiles_at_z = map(1:24) do z
         length(TileGrid(extent, z, crs))
     end
-    return searchsortedfirst(tiles_at_z, target_ntiles)
+    return findmin(x -> abs(x - target_ntiles), tiles_at_z)[2]
 end
 
 # grow an extent
