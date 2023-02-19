@@ -301,17 +301,7 @@ function update_tiles!(tyler::Map, area::Extent)
     foreach(tile -> queue_tile!(tyler, tile), to_add)
 end
 
-# Get z from the size of the extent and screen resolution
-# This fixes z so its the same zooming in or out
-function z_index(extent::Extent, res::NamedTuple, crs::MapTiles.WebMercator)
-    ntiles = map(r -> r / 256, res)
-    tile_size_X = (extent.X[2] - extent.X[1]) / ntiles.X 
-    tile_size_Y = (extent.Y[2] - extent.Y[1]) / ntiles.Y 
-    tile_size = (tile_size_X + tile_size_Y) / 2
-    z = log2(MapTiles.CE / tile_size)
-    return round(Int, z)
-end
-function z_index(extent::Extent, res::NamedTuple, crs::MapTiles.WGS84)
+function z_index(extent::Extent, res::NamedTuple, crs)
     # Calculate the number of tiles at each z and get the one 
     # closest to the resolution `res`
     target_ntiles = prod(map(r -> r / 256, res))
