@@ -20,10 +20,7 @@ delta = 1;
 ## create rectangle for display extents in web_mercator
 frame = Rect2f(lon - delta/2, lat-delta/2, delta, delta)
 ## show map
-m = Tyler.Map(frame;
-    provider, min_tiles=8, max_tiles=16,
-    figure=Figure(resolution=(1000, 600))
-    )
+m = Tyler.Map(frame; provider, figure=Figure(resolution=(1000, 600)))
 ## wait for tiles to fully load
 wait(m)
 
