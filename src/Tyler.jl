@@ -63,7 +63,7 @@ function Base.show(io::IO, m::MIME"image/png", map::Map)
     Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
 end
 
-function Map(rect::Union{Rect,Extent}, input_cs=wgs84;
+function Map(extent::Union{Rect,Extent}, input_cs=wgs84;
         resolution=(1000, 1000),
         figure=Figure(; resolution),
         coordinate_system = MapTiles.web_mercator,
