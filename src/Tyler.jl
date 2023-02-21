@@ -104,7 +104,7 @@ function Map(extent::Union{Rect,Extent}, input_cs=wgs84;
         display_task, download_task, screen,
         depth, halo, scale
     )
-    tyler.zoom[] = get_zoom(tyler, ext)
+    tyler.zoom[] = get_zoom(tyler, extent)
     download_task[] = @async begin
         while isopen(screen)
             # we dont download all tiles at once, so when one download task finishes, we may want to schedule more downloads:
