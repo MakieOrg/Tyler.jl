@@ -103,8 +103,10 @@ nav:
   - "Home": "index.md"
   - "User Guide":
     - "Basic demo" : "examples/generated/UserGuide/start.md"
+    - "Basic features: scatter, polygon and text" : "examples/generated/UserGuide/basic_features.md"
     - "Whale shark trajectory" : "examples/generated/UserGuide/whale_ex.md"
     - "Map Tile providers" : "examples/generated/UserGuide/providers.md"
     - "OSMMakie integration" : "examples/generated/UserGuide/osmmakie.md"
-    - "On The Fly Interpolation" : "examples/generated/UserGuide/interpolation.md" 
-
+    - "On The Fly Interpolation" : "examples/generated/UserGuide/interpolation.md"
+  - "Contributors":
+    - "Contribute to Documentation" : "examples/generated/Contributors/Howto.md"

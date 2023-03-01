@@ -4,10 +4,10 @@
 
 [Tyler.jl](https://makieorg.github.io/Tyler.jl/dev/) is package for displaying tiled maps interactively, with [Makie.jl](https://github.com/MakieOrg/Makie.jl).
 
-Install like this until deps are registered:
+Install like this until Tyler is registered:
 
 ```julia
-]add https://github.com/JuliaGeo/TileProviders.jl https://github.com/JuliaGeo/MapTiles.jl https://github.com/MakieOrg/Tyler.jl.git
+]add https://github.com/MakieOrg/Tyler.jl.git
 ```
 ```julia
 using Tyler, GLMakie
