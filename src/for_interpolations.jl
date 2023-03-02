@@ -1,6 +1,6 @@
 module ForInterpolations
  
-    using Interpolations, MapTiles
+    using MapTiles
     using TileProviders: AbstractProvider
     export tile2positions, Interpolator
 
@@ -20,7 +20,7 @@ module ForInterpolations
     end
 
     struct Interpolator <: AbstractProvider
-        url::Union{Function,Interpolations.GriddedInterpolation}
+        url::Function
         options::Dict{Symbol,Any}
     end
 
