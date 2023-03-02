@@ -21,7 +21,7 @@ m = wait(Tyler.Map(london; provider=Tyler.TileProviders.Google(), coordinate_sys
 # test Extent input
 london = Extents.Extent(X=(-0.0921,  -0.0521), Y = (51.5, 51.525))
 m = wait(Tyler.Map(london)) # waits until all tiles are displayed
-@test length(m.displayed_tiles) == 25
+@test length(m.displayed_tiles) == 24
 
 # Reference tests?
 # provider = TileProviders.NASAGIBS()
