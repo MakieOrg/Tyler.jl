@@ -63,7 +63,7 @@ function Base.show(io::IO, m::MIME"image/png", map::Map)
     Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
 end
 
-function Map(rect::Rect, input_cs=wgs84;
+function Map(extent::Union{Rect,Extent}, input_cs=wgs84;
         resolution=(1000, 1000),
         figure=Figure(; resolution),
         coordinate_system = MapTiles.web_mercator,
@@ -78,14 +78,18 @@ function Map(rect::Rect, input_cs=wgs84;
     tiles_being_added = ThreadSafeDict{Tile,Task}()
     downloaded_tiles = Channel{Tuple{Tile,TileImage}}(128)
     screen = display(figure; title="Tyler (with Makie)")
+
+    # if extent input is a HyperRectangle then convert to type Extent
+    extent isa Extent ||  (extent = Extents.extent(extent))
+
     if isnothing(screen)
         error("please load either GLMakie, WGLMakie or CairoMakie")
     end
     display_task = Base.RefValue{Task}()
     nx, ny = cld.(size(screen), 256)
     download_task = Base.RefValue{Task}()
-    ext = Extents.extent(rect)
-    ext_target = MapTiles.project_extent(ext, input_cs, coordinate_system)
+    
+    ext_target = MapTiles.project_extent(extent, input_cs, coordinate_system)
     X = ext_target.X
     Y = ext_target.Y
     axis = Axis(figure[1, 1]; aspect=DataAspect(), limits=(X[1], X[2], Y[1], Y[2]))
@@ -100,7 +104,7 @@ function Map(rect::Rect, input_cs=wgs84;
         display_task, download_task, screen,
         depth, halo, scale
     )
-    tyler.zoom[] = get_zoom(tyler, ext)
+    tyler.zoom[] = get_zoom(tyler, extent)
     download_task[] = @async begin
         while isopen(screen)
             # we dont download all tiles at once, so when one download task finishes, we may want to schedule more downloads:
@@ -131,9 +135,9 @@ function Map(rect::Rect, input_cs=wgs84;
     # Queue tiles to be downloaded & displayed
     update_tiles!(tyler, ext_target)
 
-    on(axis.finallimits) do rect
+    on(axis.finallimits) do extent
         isopen(screen) || return
-        update_tiles!(tyler, Extents.extent(rect))
+        update_tiles!(tyler, extent)
         return
     end
     return tyler
