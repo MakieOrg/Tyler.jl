@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - master
+      - AddInterpolations
     tags: '*'
   pull_request:
 
