@@ -268,7 +268,8 @@ function get_zoom(tyler::Map, area)
     clamp(z_index(area, (X=res[2], Y=res[1]), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
 end
 
-function update_tiles!(tyler::Map, area::Extent)
+function update_tiles!(tyler::Map, area::Union{Rect,Extent})
+    area = typeof(area) <: Rect ? Extents.extent(area) : area
     # `depth` determines the number of layers below the current
     # layer to load. Tiles are downloaded in order from lowest to highest zoom.
     depth = tyler.depth
@@ -305,7 +306,7 @@ function update_tiles!(tyler::Map, area::Extent)
     foreach(tile -> queue_tile!(tyler, tile), to_add)
 end
 
-function z_index(extent::Extent, res::NamedTuple, crs)
+function z_index(extent::Union{Rect,Extent}, res::NamedTuple, crs)
     # Calculate the number of tiles at each z and get the one 
     # closest to the resolution `res`
     target_ntiles = prod(map(r -> r / 256, res))
@@ -316,7 +317,7 @@ function z_index(extent::Extent, res::NamedTuple, crs)
 end
 
 # grow an extent
-function grow(area::Extent, factor)
+function grow(area::Union{Rect,Extent}, factor)
     map(Extents.bounds(area)) do axis_bounds
         span = axis_bounds[2] - axis_bounds[1]
         pad = factor * span / 2
