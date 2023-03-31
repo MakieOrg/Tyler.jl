@@ -88,7 +88,7 @@ function Map(extent::Union{Rect,Extent}, input_cs=wgs84;
     display_task = Base.RefValue{Task}()
     nx, ny = cld.(size(screen), 256)
     download_task = Base.RefValue{Task}()
-    
+
     ext_target = MapTiles.project_extent(extent, input_cs, coordinate_system)
     X = ext_target.X
     Y = ext_target.Y
@@ -263,7 +263,7 @@ end
 TileProviders.max_zoom(tyler::Map) = Int(max_zoom(tyler.provider))
 TileProviders.min_zoom(tyler::Map) = Int(min_zoom(tyler.provider))
 
-function get_zoom(tyler::Map, area) 
+function get_zoom(tyler::Map, area)
     res = tyler.figure.scene.theme.resolution.val .* tyler.scale
     clamp(z_index(area, (X=res[2], Y=res[1]), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
 end
@@ -277,22 +277,39 @@ function update_tiles!(tyler::Map, area::Union{Rect,Extent})
     # Calculate the zoom level
     zoom = get_zoom(tyler, area)
     tyler.zoom[] = zoom
+
     # And the z layers we will plot
     layer_range = max(min_zoom(tyler), zoom - depth):zoom
+    # Get the tiles around the mouse first
+    xpos, ypos = mouse_pos = Makie.mouseposition(tyler.axis.scene)
+    xspan = (area.X[2] - area.X[1]) * 0.01
+    yspan = (area.Y[2] - area.Y[1]) * 0.01
+    mouse_area = Extents.Extent(X=(xpos - xspan, xpos + xspan), Y=(ypos - yspan, ypos + yspan))
+    # Make a halo around the mouse tile to load next, intersecting area so we don't download outside the plot
+    mouse_halo_area = grow(mouse_area, 10)
     # Define a halo around the area to download last, so pan/zoom are filled already
     halo_area = grow(area, tyler.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
-    # Define all the tiles
-    area_layers = [MapTiles.TileGrid(area, z, tyler.coordinate_system) for z in layer_range]
-    halo_layers = [MapTiles.TileGrid(halo_area, z, tyler.coordinate_system) for z in layer_range]
+    # Define all the tiles in the order they will load in
+    areas = if Extents.intersects(mouse_halo_area, area)
+        mha = Extents.intersect(mouse_halo_area, area)
+        if Extents.intersects(mouse_area, area)
+            [Extents.intersect(mouse_area, area), mha, area, halo_area]
+        else
+            [mha, area, halo_area]
+        end
+    else
+        [area, halo_area]
+    end
+
+    area_layers = map(layer_range) do z
+        map(areas) do ext
+            MapTiles.TileGrid(ext, z, tyler.coordinate_system)
+        end |> Iterators.flatten
+    end |> Iterators.flatten
 
     # Create the full set of tiles
     # Using an ordered set gives a smoother load than a Set
-    new_tiles_set = OrderedSet{Tile}(
-        Iterators.flatten(
-            (Iterators.flatten(area_layers), # Visible layers load first, from lowest zoom to highest
-             Iterators.flatten(halo_layers),) # Halo loads last 
-        )
-    )
+    new_tiles_set = OrderedSet{Tile}(area_layers)
     # Remove any tiles not in the new set
     remove_tiles!(tyler, new_tiles_set)
 
@@ -307,7 +324,7 @@ function update_tiles!(tyler::Map, area::Union{Rect,Extent})
 end
 
 function z_index(extent::Union{Rect,Extent}, res::NamedTuple, crs)
-    # Calculate the number of tiles at each z and get the one 
+    # Calculate the number of tiles at each z and get the one
     # closest to the resolution `res`
     target_ntiles = prod(map(r -> r / 256, res))
     tiles_at_z = map(1:24) do z
