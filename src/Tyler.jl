@@ -264,7 +264,7 @@ TileProviders.max_zoom(tyler::Map) = Int(max_zoom(tyler.provider))
 TileProviders.min_zoom(tyler::Map) = Int(min_zoom(tyler.provider))
 
 function get_zoom(tyler::Map, area)
-    res = size(tyler.figure.scene) .* tyler.scale
+    res = size(tyler.axis.scene) .* tyler.scale
     clamp(z_index(area, (X=res[2], Y=res[1]), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
 end
 
