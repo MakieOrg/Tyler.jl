@@ -1,6 +1,6 @@
 name = "Tyler"
 uuid = "e170d443-b9d6-418a-9ee8-061e966341ef"
-authors = ["SimonDanisch"]
+authors = ["SimonDanisch <sdanisch@gmail.com>", "Lazaro Alonzo <lazarus.alon@gmail.com>", "Martijn Visser <mgvisser@gmail.com>", "Rafael Schouten <rafaelschouten@gmail.com>"]
 version = "0.1.0"
 
 [deps]
@@ -19,6 +19,18 @@ ThreadSafeDicts = "4239201d-c60e-5e0a-9702-85d713665ba7"
 TileProviders = "263fe934-28e1-4ae9-998a-c2629c5fede6"
 
 [compat]
+Colors = "0.12"
+Extents = "0.3"
+GeoInterface = "1"
+GeometryBasics = "0.4"
+HTTP = "1"
+ImageMagick = "1"
+LRUCache = "1"
+Makie = "0.19"
+MapTiles = "1"
+OrderedCollections = "1"
+ThreadSafeDicts = "0.1"
+TileProviders = "0.1"
 julia = "1"
 
 [extras]
