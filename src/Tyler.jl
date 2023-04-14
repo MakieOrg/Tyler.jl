@@ -106,11 +106,11 @@ function Map(extent::Union{Rect,Extent}, extent_crs=wgs84;
     X = ext_target.X
     Y = ext_target.Y
     axis.autolimitaspect = 1
-    limits!(axis, (X[1], X[2], Y[1], Y[2]))
+    limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
 
     plots = Dict{Tile,Any}()
     tyler = Map(
-        provider, coordinate_system,
+        provider, crs,
         Observable(1),
         figure, axis, OrderedSet{Tile}(), plots, free_tiles,
         fetched_tiles,
