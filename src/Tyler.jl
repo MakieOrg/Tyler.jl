@@ -11,7 +11,6 @@ using LRUCache
 using Makie
 using OrderedCollections
 using ThreadSafeDicts
-] add Colors Extents GeoInterface GeometryBasics HTTP ImageMagick LinearAlgebra LRUCache Makie OrderedCollections ThreadSafeDicts
 
 using Colors: N0f8
 using GeometryBasics: GLTriangleFace, decompose_uv

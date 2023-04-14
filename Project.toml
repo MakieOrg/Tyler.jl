@@ -20,7 +20,7 @@ TileProviders = "263fe934-28e1-4ae9-998a-c2629c5fede6"
 
 [compat]
 Colors = "0.12"
-Extents = "0.3"
+Extents = "0.1"
 GeoInterface = "1"
 GeometryBasics = "0.4"
 HTTP = "1"
