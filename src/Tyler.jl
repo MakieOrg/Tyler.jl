@@ -93,6 +93,7 @@ function Map(extent::Union{Rect,Extent}, input_cs=wgs84;
     X = ext_target.X
     Y = ext_target.Y
     axis = Axis(figure[1, 1]; aspect=DataAspect(), limits=(X[1], X[2], Y[1], Y[2]))
+    axis.autolimitaspect = 1
     plots = Dict{Tile,Any}()
     tyler = Map(
         provider, coordinate_system,
