@@ -8,7 +8,7 @@ using ColorSchemes
 using Colors
 using Dates
 
-url = joinpath("src/assets/data/iceloss_subset.arrow")
+url = joinpath("https://raw.githubusercontent.com/MakieOrg/Tyler.jl/master/docs/src/assets/data/iceloss_subset.arrow")
 
 ## parameter for scaling figure size
 scale = 1;
@@ -81,4 +81,4 @@ end
 #       Ice loss from the Greenland Ice Sheet: 1972-2022.
 #       Contact person: Alex Gardner & Chad Greene
 
-# ![type:video]("src/assets/iceloss.mp4)
+# ![type:video]("https://raw.githubusercontent.com/MakieOrg/Tyler.jl/master/docs/src/assets/iceloss.mp4")
