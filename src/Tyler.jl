@@ -73,7 +73,7 @@ struct Map
     halo::Float64
     scale::Float64
 end
-function Map(extent::Union{Rect,Extent}, extent_crs=wgs84; 
+function Map(extent, extent_crs=wgs84; 
     resolution=(1000, 1000),
     figure=Figure(; resolution),
     axis=Axis(figure[1, 1]; aspect=DataAspect()),
@@ -85,6 +85,8 @@ function Map(extent::Union{Rect,Extent}, extent_crs=wgs84;
     halo=0.2, 
     scale=1.0
 )
+    # if extent input is a HyperRectangle then convert to type Extent
+    extent isa Extent ||  (extent = Extents.extent(extent))
 
     fetched_tiles = LRU{Tile, Matrix{RGB{N0f8}}}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
     free_tiles = Makie.Combined[]
@@ -180,6 +182,8 @@ function Base.show(io::IO, m::MIME"image/png", map::Map)
     Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
 end
 
+GeoInterface.crs(tyler::Map) = map.crs
+Extents.extent(tyler::Map) = Extents.extent(tyler.axis.finallimits[])
 
 function stop_download!(map::Map, tile::Tile)
     # delete!(map.tiles_being_added, tile)
@@ -247,8 +251,6 @@ function create_tile_plot!(tyler::Map, tile::Tile, image::TileImage)
     tyler.plots[tile] = mplot
     place_tile!(tile, mplot, tyler.crs)
 end
-
-##
 
 function fetch_tile(tyler::Map, tile::Tile)
     return get!(tyler.fetched_tiles, tile) do
