@@ -1,7 +1,3 @@
-#]add ColorSchemes
-#]add Colors
-#]add Arrow
-
 using Tyler
 using GLMakie
 using Arrow
@@ -12,7 +8,7 @@ using ColorSchemes
 using Colors
 using Dates
 
-url = joinpath("./docs/src/assets/data/iceloss_subset.arrow")
+url = joinpath("src/assets/data/iceloss_subset.arrow")
 
 ## parameter for scaling figure size
 scale = 1;
@@ -54,7 +50,8 @@ scatter!(m.axis, X, Y; color = Z, colormap = cmap0, colorrange = [0, n], markers
 a,b = extrema(df.Date);
 a = year(a);
 b = year(b);
-Colorbar(m.figure[1,2]; colormap = cmap0, colorrange = [a,b], ticklabelsize = 50 * scale, width = 100 * scale);
+Colorbar(m.figure[1,2]; colormap = cmap0, colorrange = [a,b], 
+    ticklabelsize = 50 * scale, width = 100 * scale);
 
 ## hide ticks, grid and lables
 hidedecorations!(m.axis);
@@ -84,4 +81,4 @@ end
 #       Ice loss from the Greenland Ice Sheet: 1972-2022.
 #       Contact person: Alex Gardner & Chad Greene
 
-# ![type:video]("./docs/src/assets/iceloss.mp4)
+# ![type:video]("src/assets/iceloss.mp4)
