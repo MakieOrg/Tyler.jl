@@ -4,17 +4,18 @@ using Arrow
 using DataFrames
 using TileProviders
 using Extents
-using ColorSchemes
 using Colors
 using Dates
+using HTTP
 
-url = joinpath("https://raw.githubusercontent.com/MakieOrg/Tyler.jl/master/docs/src/assets/data/iceloss_subset.arrow")
+url = joinpath("https://github.com/JuliaGeo/JuliaGeoData/blob/365a09596bfca59e0977c20c2c2f566c0b29dbaa/assets/data/iceloss_subset.arrow?raw=true")
 
 ## parameter for scaling figure size
 scale = 1;
 
 ## load ice loss data [courtesy of Chad Greene @ JPL]
-df = DataFrame(Arrow.Table(url));
+resp = HTTP.get(url)
+df = DataFrame(Arrow.Table(resp.body));
 
 ## select map provider
 provider = TileProviders.Esri(:WorldImagery);
@@ -30,17 +31,15 @@ Z = [repeat([i],c) for (i, c) = enumerate(cnt)];
 Z = reduce(vcat,Z);
 
 ## make color map
-cmap = ColorSchemes.thermal.colors;
-nc = length(cmap);
-alpha = zeros(nc);
-cmap = RGBA.(cmap, alpha);
+cmap1 = RGBf.(Makie.to_colormap(:thermal))
+nc = length(cmap1);
+alpha0 = zeros(nc);
+cmap = RGBA.(cmap1, alpha0);
 cmap0 = Observable(cmap);
 
-## add frame
-frame = Rect2f(extent.X[1], extent.Y[1], extent.X[2] - extent.X[1], extent.Y[2] - extent.Y[1]);
 
 ## show map
-m = Tyler.Map(frame; provider, figure=Figure(resolution=(1912 * scale, 2284 * scale)));
+m = Tyler.Map(extent; provider, figure=Figure(resolution=(1912 * scale, 2284 * scale)));
 
 ## create initial scatter plot
 n = nrow(df);
@@ -64,15 +63,14 @@ for k = 1:15
 
     # reset apha
     i = 1;
-    cmap = ColorSchemes.thermal.colors;
-    alpha = zeros(length(cmap));
-    cmap0[] = RGBA.(cmap, alpha);
+    alpha = zeros(nc);
+    cmap0[] = RGBA.(cmap1, alpha);
 
     for i in 2:1:n
          # modify alpha
         alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5);
         alpha[maximum([1,round(Int64,i*nc/n)])] = 1;
-        cmap0[] = RGBA.(ColorSchemes.thermal.colors, alpha);
+        cmap0[] = RGBA.(cmap1, alpha);
         sleep(0.001);
     end
 end
@@ -81,4 +79,4 @@ end
 #       Ice loss from the Greenland Ice Sheet: 1972-2022.
 #       Contact person: Alex Gardner & Chad Greene
 
-# ![type:video]("https://raw.githubusercontent.com/MakieOrg/Tyler.jl/master/docs/src/assets/iceloss.mp4")
+# ![type:video]("https://github.com/JuliaGeo/JuliaGeoData/raw/main/assets/videos/iceloss.mp4")
