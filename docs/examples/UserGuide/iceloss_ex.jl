@@ -1,3 +1,5 @@
+# # Greenland ice loss example: animated & interactive
+
 using Tyler
 using GLMakie
 using Arrow
@@ -8,13 +10,13 @@ using Colors
 using Dates
 using HTTP
 
-url = joinpath("https://github.com/JuliaGeo/JuliaGeoData/blob/365a09596bfca59e0977c20c2c2f566c0b29dbaa/assets/data/iceloss_subset.arrow?raw=true")
+url = "https://github.com/JuliaGeo/JuliaGeoData/blob/365a09596bfca59e0977c20c2c2f566c0b29dbaa/assets/data/iceloss_subset.arrow?raw=true";
 
 ## parameter for scaling figure size
 scale = 1;
 
 ## load ice loss data [courtesy of Chad Greene @ JPL]
-resp = HTTP.get(url)
+resp = HTTP.get(url);
 df = DataFrame(Arrow.Table(resp.body));
 
 ## select map provider
@@ -31,12 +33,11 @@ Z = [repeat([i],c) for (i, c) = enumerate(cnt)];
 Z = reduce(vcat,Z);
 
 ## make color map
-cmap1 = RGBf.(Makie.to_colormap(:thermal))
+cmap1 = RGBf.(Makie.to_colormap(:thermal));
 nc = length(cmap1);
 alpha0 = zeros(nc);
 cmap = RGBA.(cmap1, alpha0);
 cmap0 = Observable(cmap);
-
 
 ## show map
 m = Tyler.Map(extent; provider, figure=Figure(resolution=(1912 * scale, 2284 * scale)));
@@ -45,12 +46,11 @@ m = Tyler.Map(extent; provider, figure=Figure(resolution=(1912 * scale, 2284 * s
 n = nrow(df);
 scatter!(m.axis, X, Y; color = Z, colormap = cmap0, colorrange = [0, n], markersize = 10);
 
-# add color bar
+## add color bar
 a,b = extrema(df.Date);
 a = year(a);
 b = year(b);
-Colorbar(m.figure[1,2]; colormap = cmap0, colorrange = [a,b], 
-    ticklabelsize = 50 * scale, width = 100 * scale);
+Colorbar(m.figure[1,2]; colormap = cmap0, colorrange = [a,b], ticklabelsize = 50 * scale, width = 100 * scale);
 
 ## hide ticks, grid and lables
 hidedecorations!(m.axis);
@@ -58,22 +58,22 @@ hidedecorations!(m.axis);
 ## hide frames
 hidespines!(m.axis);
 
-## loop to create animation
-for k = 1:15
-
+## loop to create animation 
+k = 1
+# for k = 1:15 # commented out for documenter [!!uncomment to run interactive example!!]
     # reset apha
     i = 1;
     alpha = zeros(nc);
     cmap0[] = RGBA.(cmap1, alpha);
 
-    for i in 2:1:n
+#     for i in 2:1:n # commented out for documenter [!!uncomment to run interactive example!!]
          # modify alpha
         alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5);
         alpha[maximum([1,round(Int64,i*nc/n)])] = 1;
         cmap0[] = RGBA.(cmap1, alpha);
         sleep(0.001);
-    end
-end
+#    end # commented out for documenter [!!uncomment to run interactive example!!]
+#end # commented out for documenter [!!uncomment to run interactive example!!]
 
 # !!! info
 #       Ice loss from the Greenland Ice Sheet: 1972-2022.
