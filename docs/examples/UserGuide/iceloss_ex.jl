@@ -33,24 +33,23 @@ Z = [repeat([i],c) for (i, c) = enumerate(cnt)];
 Z = reduce(vcat,Z);
 
 ## make color map
-cmap1 = RGBf.(Makie.to_colormap(:thermal));
-nc = length(cmap1);
-alpha0 = zeros(nc);
-cmap = RGBA.(cmap1, alpha0);
-cmap0 = Observable(cmap);
+nc = length(Makie.to_colormap(:thermal));
+alpha0 = ones(nc);
+cmap = Colors.alphacolor.(Makie.to_colormap(:thermal), alpha0)
+cmap = Observable(cmap);
 
 ## show map
 m = Tyler.Map(extent; provider, figure=Figure(resolution=(1912 * scale, 2284 * scale)));
 
 ## create initial scatter plot
 n = nrow(df);
-scatter!(m.axis, X, Y; color = Z, colormap = cmap0, colorrange = [0, n], markersize = 10);
+scatter!(m.axis, X, Y; color = Z, colormap = cmap, colorrange = [0, n], markersize = 10);
 
 ## add color bar
 a,b = extrema(df.Date);
 a = year(a);
 b = year(b);
-Colorbar(m.figure[1,2]; colormap = cmap0, colorrange = [a,b], ticklabelsize = 50 * scale, width = 100 * scale);
+Colorbar(m.figure[1,2]; colormap = cmap, colorrange = [a,b], ticklabelsize = 50 * scale, width = 100 * scale);
 
 ## hide ticks, grid and lables
 hidedecorations!(m.axis);
@@ -64,13 +63,13 @@ k = 1
     # reset apha
     i = 1;
     alpha = zeros(nc);
-    cmap0[] = RGBA.(cmap1, alpha);
+    cmap[] = Colors.alphacolor.(cmap[], alpha)
 
 #     for i in 2:1:n # commented out for documenter [!!uncomment to run interactive example!!]
          # modify alpha
         alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5);
         alpha[maximum([1,round(Int64,i*nc/n)])] = 1;
-        cmap0[] = RGBA.(cmap1, alpha);
+        cmap[] = Colors.alphacolor.(cmap[], alpha)
         sleep(0.001);
 #    end # commented out for documenter [!!uncomment to run interactive example!!]
 #end # commented out for documenter [!!uncomment to run interactive example!!]
