@@ -19,6 +19,8 @@ function getfiles()
 end
 
 srcsfiles = getfiles()
+exclude = .!isdir.(get_example_path.(srcsfiles));
+srcsfiles = srcsfiles[exclude]
 
 for (d, paths) in (("tutorial", srcsfiles),)
     for p in paths
