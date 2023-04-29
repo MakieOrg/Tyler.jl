@@ -77,6 +77,29 @@ struct Map
     halo::Float64
     scale::Float64
 end
+
+# Wait for all tiles to be loaded
+function Base.wait(map::Map)
+    while true
+        if !isempty(map.tiles_being_added)
+            wait(last(first(map.tiles_being_added)))
+        end
+        if !isempty(map.queued_but_not_downloaded)
+            sleep(0.001) # we don't have a task to wait on, so we sleep
+        end
+        # We're done if both are empty!
+        if isempty(map.tiles_being_added) && isempty(map.queued_but_not_downloaded)
+            return map
+        end
+    end
+end
+
+Base.showable(::MIME"image/png", ::Map) = true
+function Base.show(io::IO, m::MIME"image/png", map::Map)
+    wait(map)
+    Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
+end
+
 function Map(extent, extent_crs=wgs84;
     resolution=(1000, 1000),
     figure=Makie.Figure(; resolution),
@@ -162,27 +185,6 @@ function Map(extent, extent_crs=wgs84;
         return
     end
     return tyler
-end
-
-# Wait for all tiles to be loaded
-function Base.wait(map::Map)
-    while true
-        if !isempty(map.tiles_being_added)
-            wait(last(first(map.tiles_being_added)))
-        end
-        if !isempty(map.queued_but_not_downloaded)
-            sleep(0.001) # we don't have a task to wait on, so we sleep
-        end
-        # We're done if both are empty!
-        if isempty(map.tiles_being_added) && isempty(map.queued_but_not_downloaded)
-            return map
-        end
-    end
-end
-Base.showable(::MIME"image/png", ::Map) = true
-function Base.show(io::IO, m::MIME"image/png", map::Map)
-    wait(map)
-    Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
 end
 
 GeoInterface.crs(tyler::Map) = tyler.crs
