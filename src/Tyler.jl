@@ -106,7 +106,7 @@ function Map(extent, extent_crs=wgs84;
     axis=Makie.Axis(figure[1, 1]; aspect=Makie.DataAspect()),
     provider=TileProviders.OpenStreetMap(:Mapnik),
     crs=MapTiles.web_mercator,
-    max_parallel_downloads=8,
+    max_parallel_downloads=16,
     cache_size_gb=5,
     depth=8,
     halo=0.2,
