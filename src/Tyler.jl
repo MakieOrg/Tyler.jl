@@ -99,7 +99,7 @@ function Map(extent, extent_crs=wgs84;
     screen = display(figure; title="Tyler (with Makie)")
 
     if isnothing(screen)
-        error("please load either GLMakie or WGLMakie or CairoMakie")
+        error("please load either GLMakie or WGLMakie")
     end
     display_task = Base.RefValue{Task}()
     nx, ny = cld.(size(screen), 256)
