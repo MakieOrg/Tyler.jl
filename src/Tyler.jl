@@ -1,20 +1,25 @@
 module Tyler
 
-using Colors
-using Extents
-using GeoInterface
-using GeometryBasics
-using HTTP
-using ImageMagick
-using LinearAlgebra
-using LRUCache
-using Makie
-using OrderedCollections
-using ThreadSafeDicts
+import Colors
+import Extents
+import GeoInterface
+import GeometryBasics
+import HTTP
+import ImageMagick
+import LinearAlgebra
+import LRUCache
+import Makie
+import OrderedCollections
+import ThreadSafeDicts
 
-using Colors: N0f8
-using GeometryBasics: GLTriangleFace, decompose_uv
+using Colors: RGB, N0f8
+using Extents: Extent
+using GeometryBasics: GLTriangleFace, Point2f, Vec2f, Rect2f, Rect2, Rect, decompose, decompose_uv
+using LRUCache: LRU
 using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
+using Makie: on, isopen, Observable, Figure, Axis, meta, mesh!, translate!, scale!
+using OrderedCollections: OrderedSet
+using ThreadSafeDicts: ThreadSafeDict
 using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
 
 include("for_interpolations.jl")
@@ -34,7 +39,7 @@ downloading and plotting more as you zoom and pan.
 
 -`extent`: the initual extent of the map, as a `GeometryBasics.Rect`
     or an `Extents.Extent` in the projection of `extent_crs`.
--`extent_crs`: Any `GeoFormatTypes` crs.
+-`extent_crs`: Any `GeoFormatTypes` compatible crs, the default is wsg84.
 
 # Keywords
 
@@ -75,11 +80,11 @@ struct Map
 end
 function Map(extent, extent_crs=wgs84; 
     resolution=(1000, 1000),
-    figure=Figure(; resolution),
-    axis=Axis(figure[1, 1]; aspect=DataAspect()),
+    figure=Makie.Figure(; resolution),
+    axis=Makie.Axis(figure[1, 1]; aspect=Makie.DataAspect()),
     provider=TileProviders.OpenStreetMap(:Mapnik),
     crs=MapTiles.web_mercator,
-    max_parallel_downloads=16,
+    max_parallel_downloads=8,
     cache_size_gb=5,
     depth=8, 
     halo=0.2, 
@@ -108,7 +113,7 @@ function Map(extent, extent_crs=wgs84;
     X = ext_target.X
     Y = ext_target.Y
     axis.autolimitaspect = 1
-    limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
+    Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
 
     plots = Dict{Tile,Any}()
     tyler = Map(
@@ -160,7 +165,7 @@ function Map(extent, extent_crs=wgs84;
     return tyler
 end
 
-# Wait for all tiles to be
+# Wait for all tiles to be loaded
 function Base.wait(map::Map)
     while true
         if !isempty(map.tiles_being_added)
@@ -221,7 +226,7 @@ function create_tileplot!(axis, image)
     faces = decompose(GLTriangleFace, rect)
     uv = decompose_uv(rect)
     map!(uv -> Vec2f(uv[1], 1 - uv[2]), uv, uv)
-    m = GeometryBasics.Mesh(meta(points; uv=uv), faces)
+    m = GeometryBasics.Mesh(Makie.meta(points; uv=uv), faces)
     # Plot directly into scene to not update limits
     return mesh!(axis.scene, m; color=image, shading=false, inspectable=false)
 end
@@ -315,7 +320,7 @@ function queue_tile!(tyler::Map, tile)
     end
 end
 
-# FIXME: this is type pyracy
+# FIXME: this is type pyracy, it should be in GeometryBasics.jl
 function Extents.extent(rect::Rect2)
     (xmin, ymin), (xmax, ymax) = extrema(rect)
     return Extent(X=(xmin, xmax), Y=(ymin, ymax))
@@ -412,5 +417,6 @@ function debug_tiles!(map::Tyler.Map)
         debug_tile!(m, tile)
     end
 end
+
 
 end
