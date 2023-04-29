@@ -83,7 +83,7 @@ function Map(extent, extent_crs=wgs84;
     axis=Makie.Axis(figure[1, 1]; aspect=Makie.DataAspect()),
     provider=TileProviders.OpenStreetMap(:Mapnik),
     crs=MapTiles.web_mercator,
-    max_parallel_downloads=16,
+    max_parallel_downloads=8,
     cache_size_gb=5,
     depth=8,
     halo=0.2,
@@ -179,15 +179,20 @@ function Base.wait(map::Map)
         end
     end
 end
-
 Base.showable(::MIME"image/png", ::Map) = true
 function Base.show(io::IO, m::MIME"image/png", map::Map)
     wait(map)
     Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
 end
 
-GeoInterface.crs(tyler::Map) = map.crs
+GeoInterface.crs(tyler::Map) = tyler.crs
 Extents.extent(tyler::Map) = Extents.extent(tyler.axis.finallimits[])
+
+# FIXME: this is type pyracy, it should be in GeometryBasics.jl
+function Extents.extent(rect::Rect2)
+    (xmin, ymin), (xmax, ymax) = extrema(rect)
+    return Extent(X=(xmin, xmax), Y=(ymin, ymax))
+end
 
 function stop_download!(map::Map, tile::Tile)
     # delete!(map.tiles_being_added, tile)
@@ -258,10 +263,9 @@ end
 
 function fetch_tile(tyler::Map, tile::Tile)
     return get!(tyler.fetched_tiles, tile) do
-        fetch_tile(tyler.provider,tile)
+        fetch_tile(tyler.provider, tile)
     end
 end
-
 function fetch_tile(provider::AbstractProvider, tile::Tile)
     url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
     result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
@@ -303,13 +307,6 @@ function queue_tile!(tyler::Map, tile)
             delete!(queue, tile)
         end
     end
-end
-
-
-# FIXME: this is type pyracy, it should be in GeometryBasics.jl
-function Extents.extent(rect::Rect2)
-    (xmin, ymin), (xmax, ymax) = extrema(rect)
-    return Extent(X=(xmin, xmax), Y=(ymin, ymax))
 end
 
 TileProviders.max_zoom(tyler::Map) = Int(max_zoom(tyler.provider))
