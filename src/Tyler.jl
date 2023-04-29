@@ -228,7 +228,7 @@ function create_tileplot!(axis, image)
     faces = decompose(GLTriangleFace, rect)
     uv = decompose_uv(rect)
     map!(uv -> Vec2f(uv[1], 1 - uv[2]), uv, uv)
-    m = GeometryBasics.Mesh(Makie.meta(points; uv=uv), faces)
+    m = GeometryBasics.Mesh(meta(points; uv=uv), faces)
     # Plot directly into scene to not update limits
     return mesh!(axis.scene, m; color=image, shading=false, inspectable=false)
 end
