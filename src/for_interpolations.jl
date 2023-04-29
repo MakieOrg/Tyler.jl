@@ -4,7 +4,7 @@
 
     Interpolator(f; colormap=:thermal, options=Dict(:minzoom=1, :maxzoom=19))
 
-Provides tiles by intolating them on the fly.
+Provides tiles by interpolating them on the fly.
 
 - `f`: an Interpolations.jl interpolator or similar.
 - `colormap`: A `Symbol` or `Vector{RGBA{Float32}}`. Default is `:thermal`.
