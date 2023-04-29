@@ -17,12 +17,12 @@ using Extents: Extent
 using GeometryBasics: GLTriangleFace, Point2f, Vec2f, Rect2f, Rect2, Rect, decompose, decompose_uv
 using LRUCache: LRU
 using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
-using Makie: on, isopen, Observable, Figure, Axis, meta, mesh!, translate!, scale!
+using Makie: Observable, Figure, Axis, RGBAf, on, isopen, meta, mesh!, translate!, scale!
 using OrderedCollections: OrderedSet
 using ThreadSafeDicts: ThreadSafeDict
 using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
 
-include("for_interpolations.jl")
+include("interpolations.jl")
 
 const TileImage = Matrix{RGB{N0f8}}
 
@@ -77,7 +77,7 @@ struct Map
     halo::Float64
     scale::Float64
 end
-function Map(extent, extent_crs=wgs84; 
+function Map(extent, extent_crs=wgs84;
     resolution=(1000, 1000),
     figure=Makie.Figure(; resolution),
     axis=Makie.Axis(figure[1, 1]; aspect=Makie.DataAspect()),
@@ -85,8 +85,8 @@ function Map(extent, extent_crs=wgs84;
     crs=MapTiles.web_mercator,
     max_parallel_downloads=8,
     cache_size_gb=5,
-    depth=8, 
-    halo=0.2, 
+    depth=8,
+    halo=0.2,
     scale=1.0
 )
     # if extent input is a HyperRectangle then convert to type Extent
@@ -268,13 +268,6 @@ function fetch_tile(provider::AbstractProvider, tile::Tile)
     return ImageMagick.readblob(result.body)
 end
 
-cols=Makie.to_colormap(:thermal)
-col(i)=RGBAf(Makie.interpolated_getindex(cols,i))
-col(i::RGBAf)=i
-
-
-##
-
 function queue_tile!(tyler::Map, tile)
     queue = tyler.tiles_being_added
     # NO need to start a need task!
@@ -311,6 +304,7 @@ function queue_tile!(tyler::Map, tile)
         end
     end
 end
+
 
 # FIXME: this is type pyracy, it should be in GeometryBasics.jl
 function Extents.extent(rect::Rect2)
@@ -397,17 +391,6 @@ function grow_extent(area::Union{Rect,Extent}, factor)
         pad = factor * span / 2
         (axis_bounds[1] - pad, axis_bounds[2] + pad)
     end |> Extent
-end
-
-function debug_tile!(map::Tyler.Map, tile::Tile)
-    plot = linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1)
-    Tyler.place_tile!(tile, plot, web_mercator)
-end
-
-function debug_tiles!(map::Tyler.Map)
-    for tile in m.displayed_tiles
-        debug_tile!(m, tile)
-    end
 end
 
 
