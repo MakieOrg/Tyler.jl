@@ -23,7 +23,6 @@ using ThreadSafeDicts: ThreadSafeDict
 using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
 
 include("for_interpolations.jl")
-using Tyler.ForInterpolations: tile2positions, Interpolator
 
 const TileImage = Matrix{RGB{N0f8}}
 
@@ -272,13 +271,6 @@ end
 cols=Makie.to_colormap(:thermal)
 col(i)=RGBAf(Makie.interpolated_getindex(cols,i))
 col(i::RGBAf)=i
-
-function fetch_tile(provider::Interpolator, tile::Tile)
-    itp=provider.url
-    (lon,lat) = tile2positions(tile)
-    z = permutedims(itp.(lon,lat))
-    return [col(i) for i in z]
-end
 
 
 ##
