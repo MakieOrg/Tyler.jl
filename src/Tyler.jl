@@ -112,8 +112,6 @@ function Map(extent, extent_crs=wgs84;
     halo=0.2,
     scale=1.0
 )
-    # if extent input is a HyperRectangle then convert to type Extent
-    extent isa Extent ||  (extent = Extents.extent(extent))
 
     fetched_tiles = LRU{Tile, Matrix{RGB{N0f8}}}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
     free_tiles = Makie.Combined[]
@@ -160,7 +158,6 @@ function Map(extent, extent_crs=wgs84;
         empty!(tyler.queued_but_not_downloaded)
         empty!(tyler.displayed_tiles)
     end
-    #
     display_task[] = @async begin
         while isopen(screen)
             tile, img = take!(downloaded_tiles)
