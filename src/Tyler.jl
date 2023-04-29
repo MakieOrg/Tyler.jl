@@ -16,6 +16,9 @@ using OrderedCollections
 using HTTP
 using ImageMagick
 
+include("for_interpolations.jl")
+using Tyler.ForInterpolations: tile2positions, Interpolator
+
 const TileImage = Matrix{RGB{N0f8}}
 
 struct Map
@@ -211,13 +214,33 @@ function create_tile_plot!(tyler::Map, tile::Tile, image::TileImage)
     place_tile!(tile, mplot, tyler.coordinate_system)
 end
 
+##
+
 function fetch_tile(tyler::Map, tile::Tile)
     return get!(tyler.fetched_tiles, tile) do
-        url = TileProviders.geturl(tyler.provider, tile.x, tile.y, tile.z)
-        result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
-        return ImageMagick.readblob(result.body)
+        fetch_tile(tyler.provider,tile)
     end
 end
+
+function fetch_tile(provider::AbstractProvider, tile::Tile)
+    url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
+    result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
+    return ImageMagick.readblob(result.body)
+end
+
+cols=Makie.to_colormap(:thermal)
+col(i)=RGBAf(Makie.interpolated_getindex(cols,i))
+col(i::RGBAf)=i
+
+function fetch_tile(provider::Interpolator, tile::Tile)
+    itp=provider.url
+    (lon,lat) = tile2positions(tile)
+    z = permutedims(itp.(lon,lat))
+    return [col(i) for i in z]
+end
+
+
+##
 
 function queue_tile!(tyler::Map, tile)
     queue = tyler.tiles_being_added
