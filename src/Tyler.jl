@@ -22,7 +22,7 @@ using OrderedCollections: OrderedSet
 using ThreadSafeDicts: ThreadSafeDict
 using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
 
-include("interpolations.jl")
+include("for_interpolations.jl")
 
 const TileImage = Matrix{RGB{N0f8}}
 
@@ -189,7 +189,6 @@ end
 
 GeoInterface.crs(tyler::Map) = tyler.crs
 Extents.extent(tyler::Map) = Extents.extent(tyler.axis.finallimits[])
-
 # FIXME: this is type pyracy, it should be in GeometryBasics.jl
 function Extents.extent(rect::Rect2)
     (xmin, ymin), (xmax, ymax) = extrema(rect)
@@ -392,5 +391,15 @@ function grow_extent(area::Union{Rect,Extent}, factor)
     end |> Extent
 end
 
+function debug_tile!(map::Tyler.Map, tile::Tile)
+    plot = linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1)
+    Tyler.place_tile!(tile, plot, web_mercator)
+end
+
+function debug_tiles!(map::Tyler.Map)
+    for tile in m.displayed_tiles
+        debug_tile!(m, tile)
+    end
+end
 
 end
