@@ -66,7 +66,7 @@ function Base.show(io::IO, m::MIME"image/png", map::Map)
     Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
 end
 
-function Map(rect::Rect, input_cs=wgs84;
+function Map(extent::Union{Rect,Extent}, input_cs=wgs84;
         resolution=(1000, 1000),
         figure=Figure(; resolution),
         coordinate_system = MapTiles.web_mercator,
@@ -81,17 +81,22 @@ function Map(rect::Rect, input_cs=wgs84;
     tiles_being_added = ThreadSafeDict{Tile,Task}()
     downloaded_tiles = Channel{Tuple{Tile,TileImage}}(128)
     screen = display(figure; title="Tyler (with Makie)")
+
+    # if extent input is a HyperRectangle then convert to type Extent
+    extent isa Extent ||  (extent = Extents.extent(extent))
+
     if isnothing(screen)
         error("please load either GLMakie, WGLMakie or CairoMakie")
     end
     display_task = Base.RefValue{Task}()
     nx, ny = cld.(size(screen), 256)
     download_task = Base.RefValue{Task}()
-    ext = Extents.extent(rect)
-    ext_target = MapTiles.project_extent(ext, input_cs, coordinate_system)
+
+    ext_target = MapTiles.project_extent(extent, input_cs, coordinate_system)
     X = ext_target.X
     Y = ext_target.Y
     axis = Axis(figure[1, 1]; aspect=DataAspect(), limits=(X[1], X[2], Y[1], Y[2]))
+    axis.autolimitaspect = 1
     plots = Dict{Tile,Any}()
     tyler = Map(
         provider, coordinate_system,
@@ -103,7 +108,7 @@ function Map(rect::Rect, input_cs=wgs84;
         display_task, download_task, screen,
         depth, halo, scale
     )
-    tyler.zoom[] = get_zoom(tyler, ext)
+    tyler.zoom[] = get_zoom(tyler, extent)
     download_task[] = @async begin
         while isopen(screen)
             # we dont download all tiles at once, so when one download task finishes, we may want to schedule more downloads:
@@ -134,9 +139,9 @@ function Map(rect::Rect, input_cs=wgs84;
     # Queue tiles to be downloaded & displayed
     update_tiles!(tyler, ext_target)
 
-    on(axis.finallimits) do rect
+    on(axis.finallimits) do extent
         isopen(screen) || return
-        update_tiles!(tyler, Extents.extent(rect))
+        update_tiles!(tyler, extent)
         return
     end
     return tyler
@@ -282,12 +287,13 @@ end
 TileProviders.max_zoom(tyler::Map) = Int(max_zoom(tyler.provider))
 TileProviders.min_zoom(tyler::Map) = Int(min_zoom(tyler.provider))
 
-function get_zoom(tyler::Map, area) 
-    res = tyler.figure.scene.theme.resolution.val .* tyler.scale
+function get_zoom(tyler::Map, area)
+    res = size(tyler.axis.scene) .* tyler.scale
     clamp(z_index(area, (X=res[2], Y=res[1]), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
 end
 
-function update_tiles!(tyler::Map, area::Extent)
+function update_tiles!(tyler::Map, area::Union{Rect,Extent})
+    area = typeof(area) <: Rect ? Extents.extent(area) : area
     # `depth` determines the number of layers below the current
     # layer to load. Tiles are downloaded in order from lowest to highest zoom.
     depth = tyler.depth
@@ -295,22 +301,39 @@ function update_tiles!(tyler::Map, area::Extent)
     # Calculate the zoom level
     zoom = get_zoom(tyler, area)
     tyler.zoom[] = zoom
+
     # And the z layers we will plot
     layer_range = max(min_zoom(tyler), zoom - depth):zoom
+    # Get the tiles around the mouse first
+    xpos, ypos = mouse_pos = Makie.mouseposition(tyler.axis.scene)
+    xspan = (area.X[2] - area.X[1]) * 0.01
+    yspan = (area.Y[2] - area.Y[1]) * 0.01
+    mouse_area = Extents.Extent(X=(xpos - xspan, xpos + xspan), Y=(ypos - yspan, ypos + yspan))
+    # Make a halo around the mouse tile to load next, intersecting area so we don't download outside the plot
+    mouse_halo_area = grow(mouse_area, 10)
     # Define a halo around the area to download last, so pan/zoom are filled already
     halo_area = grow(area, tyler.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
-    # Define all the tiles
-    area_layers = [MapTiles.TileGrid(area, z, tyler.coordinate_system) for z in layer_range]
-    halo_layers = [MapTiles.TileGrid(halo_area, z, tyler.coordinate_system) for z in layer_range]
+    # Define all the tiles in the order they will load in
+    areas = if Extents.intersects(mouse_halo_area, area)
+        mha = Extents.intersect(mouse_halo_area, area)
+        if Extents.intersects(mouse_area, area)
+            [Extents.intersect(mouse_area, area), mha, area, halo_area]
+        else
+            [mha, area, halo_area]
+        end
+    else
+        [area, halo_area]
+    end
+
+    area_layers = map(layer_range) do z
+        map(areas) do ext
+            MapTiles.TileGrid(ext, z, tyler.coordinate_system)
+        end |> Iterators.flatten
+    end |> Iterators.flatten
 
     # Create the full set of tiles
     # Using an ordered set gives a smoother load than a Set
-    new_tiles_set = OrderedSet{Tile}(
-        Iterators.flatten(
-            (Iterators.flatten(area_layers), # Visible layers load first, from lowest zoom to highest
-             Iterators.flatten(halo_layers),) # Halo loads last 
-        )
-    )
+    new_tiles_set = OrderedSet{Tile}(area_layers)
     # Remove any tiles not in the new set
     remove_tiles!(tyler, new_tiles_set)
 
@@ -324,8 +347,8 @@ function update_tiles!(tyler::Map, area::Extent)
     foreach(tile -> queue_tile!(tyler, tile), to_add)
 end
 
-function z_index(extent::Extent, res::NamedTuple, crs)
-    # Calculate the number of tiles at each z and get the one 
+function z_index(extent::Union{Rect,Extent}, res::NamedTuple, crs)
+    # Calculate the number of tiles at each z and get the one
     # closest to the resolution `res`
     target_ntiles = prod(map(r -> r / 256, res))
     tiles_at_z = map(1:24) do z
@@ -335,7 +358,7 @@ function z_index(extent::Extent, res::NamedTuple, crs)
 end
 
 # grow an extent
-function grow(area::Extent, factor)
+function grow(area::Union{Rect,Extent}, factor)
     map(Extents.bounds(area)) do axis_bounds
         span = axis_bounds[2] - axis_bounds[1]
         pad = factor * span / 2
@@ -355,4 +378,3 @@ function debug_tiles!(map::Tyler.Map)
 end
 
 end
-
