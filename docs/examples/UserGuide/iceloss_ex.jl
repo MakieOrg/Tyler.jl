@@ -59,6 +59,9 @@ hidedecorations!(m.axis);
 ## hide frames
 hidespines!(m.axis);
 
+## wait for tiles to fully load
+wait(m)
+
 ## ------ uncomment to create interactive-animated figure -----
 ## The Documenter does not allow creations of interactive plots
 
