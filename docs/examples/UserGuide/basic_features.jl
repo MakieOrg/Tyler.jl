@@ -17,10 +17,11 @@ lon = -118.1714;
 pts = Point2f(MapTiles.project((lon,lat), MapTiles.wgs84, MapTiles.web_mercator))
 ## set how much area to map in degrees
 delta = 1;
-## create rectangle for display extents in web_mercator
-frame = Rect2f(lon - delta/2, lat-delta/2, delta, delta)
+## define Extent for display in web_mercator
+extent = Extent(X = (lon - delta/2, lon + delta/2), Y = (lat-delta/2, lat+delta/2));
+
 ## show map
-m = Tyler.Map(frame; provider, figure=Figure(resolution=(1000, 600)))
+m = Tyler.Map(extent; provider, figure=Figure(resolution=(1000, 600)))
 ## wait for tiles to fully load
 wait(m)
 
