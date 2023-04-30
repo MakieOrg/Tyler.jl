@@ -6,6 +6,7 @@
 using Tyler, GLMakie
 using TileProviders
 using MapTiles
+using Extents
 
 ## select a map provider
 provider = TileProviders.Esri(:WorldImagery)
