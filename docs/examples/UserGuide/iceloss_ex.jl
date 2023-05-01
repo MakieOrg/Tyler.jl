@@ -34,15 +34,17 @@ Z = reduce(vcat,Z);
 
 ## make color map
 nc = length(Makie.to_colormap(:thermal));
-alpha0 = ones(nc);
-cmap = Colors.alphacolor.(Makie.to_colormap(:thermal), alpha0)
+n = nrow(df);
+alpha = zeros(nc);
+alpha[1:maximum([1,round(Int64,1*nc/n)])] = alpha[1:maximum([1,round(Int64,1*nc/n)])] .* (1.05^-1.5);
+alpha[maximum([1,round(Int64,1*nc/n)])] = 1;
+cmap = Colors.alphacolor.(Makie.to_colormap(:thermal), alpha);
 cmap = Observable(cmap);
 
 ## show map
 m = Tyler.Map(extent; provider, figure=Figure(resolution=(1912 * scale, 2284 * scale)));
 
 ## create initial scatter plot
-n = nrow(df);
 scatter!(m.axis, X, Y; color = Z, colormap = cmap, colorrange = [0, n], markersize = 10);
 
 ## add color bar
@@ -57,22 +59,29 @@ hidedecorations!(m.axis);
 ## hide frames
 hidespines!(m.axis);
 
-## loop to create animation 
-k = 1
-# for k = 1:15 # commented out for documenter [!!uncomment to run interactive example!!]
-    # reset apha
-    i = 1;
-    alpha = zeros(nc);
-    cmap[] = Colors.alphacolor.(cmap[], alpha)
+## wait for tiles to fully load
+wait(m)
 
-#     for i in 2:1:n # commented out for documenter [!!uncomment to run interactive example!!]
-         # modify alpha
-        alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5);
-        alpha[maximum([1,round(Int64,i*nc/n)])] = 1;
-        cmap[] = Colors.alphacolor.(cmap[], alpha)
-        sleep(0.001);
-#    end # commented out for documenter [!!uncomment to run interactive example!!]
-#end # commented out for documenter [!!uncomment to run interactive example!!]
+## ------ uncomment to create interactive-animated figure -----
+## The Documenter does not allow creations of interactive plots
+
+## loop to create animation 
+# if interactive 
+#     for k = 1:15 
+#         # reset apha
+#         alpha[:] = zeros(nc);
+#         cmap[] = Colors.alphacolor.(cmap[], alpha)
+
+#         for i in 2:1:n 
+#             # modify alpha
+#             alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5);
+#             alpha[maximum([1,round(Int64,i*nc/n)])] = 1;
+#             cmap[] = Colors.alphacolor.(cmap[], alpha);
+#             sleep(0.001);
+#         end 
+#     end
+# end
+## -----------------------------------------------------------
 
 # !!! info
 #       Ice loss from the Greenland Ice Sheet: 1972-2022.

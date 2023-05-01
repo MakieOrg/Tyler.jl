@@ -107,7 +107,7 @@ nav:
     - "Whale shark trajectory" : "examples/generated/UserGuide/whale_ex.md"
     - "Ice loss animation" : "examples/generated/UserGuide/iceloss_ex.md"
     - "Map Tile providers" : "examples/generated/UserGuide/providers.md"
-    - "OSMMakie integration" : "examples/generated/UserGuide/osmmakie.md"
+   # - "OSMMakie integration" : "examples/generated/UserGuide/osmmakie.md"
     - "On The Fly Interpolation" : "examples/generated/UserGuide/interpolation.md"
   - "Contributors":
     - "Contribute to Documentation" : "examples/generated/Contributors/Howto.md"
