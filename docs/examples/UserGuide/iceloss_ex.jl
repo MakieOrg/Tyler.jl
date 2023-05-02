@@ -85,6 +85,7 @@ wait(m)
 
 # !!! info
 #       Ice loss from the Greenland Ice Sheet: 1972-2022.
+#
 #       Contact person: Alex Gardner & Chad Greene
 
 # ![type:video]("https://github.com/JuliaGeo/JuliaGeoData/raw/main/assets/videos/iceloss.mp4")
