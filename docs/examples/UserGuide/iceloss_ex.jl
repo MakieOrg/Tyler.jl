@@ -71,7 +71,7 @@ wait(m)
 #         # reset apha
 #         alpha[:] = zeros(nc);
 #         cmap[] = Colors.alphacolor.(cmap[], alpha)
-
+#
 #         for i in 2:1:n 
 #             # modify alpha
 #             alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5);
@@ -85,6 +85,9 @@ wait(m)
 
 # !!! info
 #       Ice loss from the Greenland Ice Sheet: 1972-2022.
+#
 #       Contact person: Alex Gardner & Chad Greene
 
-# ![type:video]("https://github.com/JuliaGeo/JuliaGeoData/raw/main/assets/videos/iceloss.mp4")
+# <video src="https://github.com/JuliaGeo/JuliaGeoData/raw/main/assets/videos/iceloss.mp4" width="400" />
+
+
