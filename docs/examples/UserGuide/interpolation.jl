@@ -16,8 +16,8 @@ col(i)=RGBAf(Makie.interpolated_getindex(cols,i))
 fun(x,y) = col(itp(x,y))
 
 options = Dict(:min_zoom => 1,:max_zoom => 19)
-p1=Tyler.Interpolator(f_in_0_1_range; options)
-p2=Tyler.Interpolator(fun,options)
+p1 = Tyler.Interpolator(f_in_0_1_range; options)
+p2 = Tyler.Interpolator(fun; options)
 
 b = Rect2f(-20.0, -20.0, 40.0, 40.0)
 m = Tyler.Map(b, provider=p1)
