@@ -32,7 +32,7 @@ const TileImage = Matrix{RGB{N0f8}}
     Map(extent, [extent_crs=wgs84]; kw...)
 
 Tylers main object, it plots tiles onto a Makie.jl `Axis`,
-downloading and plotting more as you zoom and pan.
+downloading and plotting more tiles as you zoom and pan.
 
 # Arguments
 
