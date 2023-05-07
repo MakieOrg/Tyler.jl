@@ -36,7 +36,7 @@ downloading and plotting more tiles as you zoom and pan.
 
 # Arguments
 
--`extent`: the initual extent of the map, as a `GeometryBasics.Rect`
+-`extent`: the initial extent of the map, as a `GeometryBasics.Rect`
     or an `Extents.Extent` in the projection of `extent_crs`.
 -`extent_crs`: Any `GeoFormatTypes` compatible crs, the default is wsg84.
 
