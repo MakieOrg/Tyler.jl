@@ -1,24 +1,16 @@
 module Tyler
 
-import Colors
-import Extents
-import GeoInterface
-import GeometryBasics
-import HTTP
-import ImageMagick
-import LRUCache
-import Makie
-import OrderedCollections
-import ThreadSafeDicts
-
-using Colors: RGB, N0f8
-using Extents: Extent
-using GeometryBasics: GLTriangleFace, Point2f, Vec2f, Rect2f, Rect2, Rect, decompose, decompose_uv
-using LRUCache: LRU
+using Colors: Colors, RGB, N0f8
+using Extents: Extents, Extent
+using GeoInterface: GeoInterface
+using GeometryBasics: GeometryBasics, GLTriangleFace, Point2f, Vec2f, Rect2f, Rect2, Rect, decompose, decompose_uv
+using HTTP: HTTP
+using ImageMagick: ImageMagick
+using LRUCache: LRUCache, LRU
 using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
-using Makie: Observable, Figure, Axis, RGBAf, on, isopen, meta, mesh!, translate!, scale!
-using OrderedCollections: OrderedSet
-using ThreadSafeDicts: ThreadSafeDict
+using Makie: Makie, Observable, Figure, Axis, RGBAf, on, isopen, meta, mesh!, translate!, scale!
+using OrderedCollections: OrderedCollections, OrderedSet
+using ThreadSafeDicts: ThreadSafeDicts, ThreadSafeDict
 using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
 
 include("for_interpolations.jl")
