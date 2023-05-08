@@ -21,3 +21,9 @@ or
 ```
 
 The `]` character starts the Julia [package manager](https://docs.julialang.org/en/v1/stdlib/Pkg/). Hit backspace key to return to Julia prompt.
+
+## API
+
+```@autodocs
+Modules = [Tyler]
+```

@@ -1,29 +1,54 @@
 module Tyler
 
-using Makie
-using LinearAlgebra
+using Colors: Colors, RGB, N0f8
+using Extents: Extents, Extent
+using GeoInterface: GeoInterface
+using GeometryBasics: GeometryBasics, GLTriangleFace, Point2f, Vec2f, Rect2f, Rect2, Rect, decompose, decompose_uv
+using HTTP: HTTP
+using ImageMagick: ImageMagick
+using LRUCache: LRUCache, LRU
 using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
+using Makie: Makie, Observable, Figure, Axis, RGBAf, on, isopen, meta, mesh!, translate!, scale!
+using OrderedCollections: OrderedCollections, OrderedSet
+using ThreadSafeDicts: ThreadSafeDicts, ThreadSafeDict
 using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
-using Colors
-using Colors: N0f8
-using LRUCache
-using GeometryBasics
-using GeometryBasics: GLTriangleFace, decompose_uv
-using Extents
-using GeoInterface
-using ThreadSafeDicts
-using OrderedCollections
-using HTTP
-using ImageMagick
 
-include("for_interpolations.jl")
-using Tyler.ForInterpolations: tile2positions, Interpolator
+include("interpolations.jl")
 
 const TileImage = Matrix{RGB{N0f8}}
 
+"""
+    Map
+
+    Map(extent, [extent_crs=wgs84]; kw...)
+
+Tylers main object, it plots tiles onto a Makie.jl `Axis`,
+downloading and plotting more tiles as you zoom and pan.
+
+# Arguments
+
+-`extent`: the initial extent of the map, as a `GeometryBasics.Rect`
+    or an `Extents.Extent` in the projection of `extent_crs`.
+-`extent_crs`: Any `GeoFormatTypes` compatible crs, the default is wsg84.
+
+# Keywords
+
+-`resolution`: The figure resolution.
+-`figure`: an existing `Makie.Figure` object.
+-`crs`: The providers coordinate reference system.
+-`provider`: a TileProviders.jl `Provider`.
+-`max_parallel_downloads`: limits the attempted simultaneous downloads, with a default of `16`.
+-`cache_size_gb`: limits the cache for storing tiles, with a default of `5`.
+-`depth`: the number of layers to load when zooming. Lower numbers will be slightly faster
+    but have more artefacts. The default is `8`.
+-`halo`: The fraction of the width of tiles to add as a halo so that panning is smooth - the
+    tiles will already be loaded. The default is `0.2`, which means `0.1` on each side.
+-`scale`: a tile scaling factor. Low number decrease the downloads but reduce the resolution.
+    The default is `1.0`.
+"""
 struct Map
     provider::AbstractProvider
-    coordinate_system::CoordinateReferenceSystemFormat
+    crs::CoordinateReferenceSystemFormat
     zoom::Observable{Int}
     figure::Figure
     axis::Axis
@@ -44,7 +69,7 @@ struct Map
     scale::Float64
 end
 
-# Wait for all tiles to be
+# Wait for all tiles to be loaded
 function Base.wait(map::Map)
     while true
         if !isempty(map.tiles_being_added)
@@ -66,15 +91,18 @@ function Base.show(io::IO, m::MIME"image/png", map::Map)
     Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
 end
 
-function Map(extent::Union{Rect,Extent}, input_cs=wgs84;
-        resolution=(1000, 1000),
-        figure=Figure(; resolution),
-        coordinate_system = MapTiles.web_mercator,
-        provider=TileProviders.OpenStreetMap(:Mapnik),
-        max_parallel_downloads = 16,
-        cache_size_gb=5,
-        depth=8, halo=0.2, scale=1.0
-       )
+function Map(extent, extent_crs=wgs84;
+    resolution=(1000, 1000),
+    figure=Makie.Figure(; resolution),
+    axis=Makie.Axis(figure[1, 1]; aspect=Makie.DataAspect()),
+    provider=TileProviders.OpenStreetMap(:Mapnik),
+    crs=MapTiles.web_mercator,
+    max_parallel_downloads=16,
+    cache_size_gb=5,
+    depth=8,
+    halo=0.2,
+    scale=1.0
+)
 
     fetched_tiles = LRU{Tile, Matrix{RGB{N0f8}}}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
     free_tiles = Makie.Combined[]
@@ -82,24 +110,25 @@ function Map(extent::Union{Rect,Extent}, input_cs=wgs84;
     downloaded_tiles = Channel{Tuple{Tile,TileImage}}(128)
     screen = display(figure; title="Tyler (with Makie)")
 
-    # if extent input is a HyperRectangle then convert to type Extent
-    extent isa Extent ||  (extent = Extents.extent(extent))
-
     if isnothing(screen)
-        error("please load either GLMakie, WGLMakie or CairoMakie")
+        error("please load either GLMakie or WGLMakie")
     end
     display_task = Base.RefValue{Task}()
     nx, ny = cld.(size(screen), 256)
     download_task = Base.RefValue{Task}()
 
-    ext_target = MapTiles.project_extent(extent, input_cs, coordinate_system)
+    # Extent
+    # if extent input is a HyperRectangle then convert to type Extent
+    extent isa Extent ||  (extent = Extents.extent(extent))
+    ext_target = MapTiles.project_extent(extent, extent_crs, crs)
     X = ext_target.X
     Y = ext_target.Y
-    axis = Axis(figure[1, 1]; aspect=DataAspect(), limits=(X[1], X[2], Y[1], Y[2]))
     axis.autolimitaspect = 1
+    Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
+
     plots = Dict{Tile,Any}()
     tyler = Map(
-        provider, coordinate_system,
+        provider, crs,
         Observable(1),
         figure, axis, OrderedSet{Tile}(), plots, free_tiles,
         fetched_tiles,
@@ -120,7 +149,6 @@ function Map(extent::Union{Rect,Extent}, input_cs=wgs84;
         empty!(tyler.queued_but_not_downloaded)
         empty!(tyler.displayed_tiles)
     end
-    #
     display_task[] = @async begin
         while isopen(screen)
             tile, img = take!(downloaded_tiles)
@@ -145,6 +173,14 @@ function Map(extent::Union{Rect,Extent}, input_cs=wgs84;
         return
     end
     return tyler
+end
+
+GeoInterface.crs(tyler::Map) = tyler.crs
+Extents.extent(tyler::Map) = Extents.extent(tyler.axis.finallimits[])
+# FIXME: this is type pyracy, it should be in GeometryBasics.jl
+function Extents.extent(rect::Rect2)
+    (xmin, ymin), (xmax, ymax) = extrema(rect)
+    return Extent(X=(xmin, xmax), Y=(ymin, ymax))
 end
 
 function stop_download!(map::Map, tile::Tile)
@@ -188,8 +224,8 @@ function create_tileplot!(axis, image)
     return mesh!(axis.scene, m; color=image, shading=false, inspectable=false)
 end
 
-function place_tile!(tile::Tile, plot, coordinate_system)
-    bounds = MapTiles.extent(tile, coordinate_system)
+function place_tile!(tile::Tile, plot, crs)
+    bounds = MapTiles.extent(tile, crs)
     xmin, xmax = bounds.X
     ymin, ymax = bounds.Y
     translate!(plot, xmin, ymin, tile.z - 100)
@@ -211,36 +247,19 @@ function create_tile_plot!(tyler::Map, tile::Tile, image::TileImage)
         mplot.visible = true
     end
     tyler.plots[tile] = mplot
-    place_tile!(tile, mplot, tyler.coordinate_system)
+    place_tile!(tile, mplot, tyler.crs)
 end
-
-##
 
 function fetch_tile(tyler::Map, tile::Tile)
     return get!(tyler.fetched_tiles, tile) do
-        fetch_tile(tyler.provider,tile)
+        fetch_tile(tyler.provider, tile)
     end
 end
-
 function fetch_tile(provider::AbstractProvider, tile::Tile)
     url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
     result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
     return ImageMagick.readblob(result.body)
 end
-
-cols=Makie.to_colormap(:thermal)
-col(i)=RGBAf(Makie.interpolated_getindex(cols,i))
-col(i::RGBAf)=i
-
-function fetch_tile(provider::Interpolator, tile::Tile)
-    itp=provider.url
-    (lon,lat) = tile2positions(tile)
-    z = permutedims(itp.(lon,lat))
-    return [col(i) for i in z]
-end
-
-
-##
 
 function queue_tile!(tyler::Map, tile)
     queue = tyler.tiles_being_added
@@ -279,17 +298,12 @@ function queue_tile!(tyler::Map, tile)
     end
 end
 
-function Extents.extent(rect::Rect2)
-    (xmin, ymin), (xmax, ymax) = extrema(rect)
-    return Extent(X=(xmin, xmax), Y=(ymin, ymax))
-end
-
 TileProviders.max_zoom(tyler::Map) = Int(max_zoom(tyler.provider))
 TileProviders.min_zoom(tyler::Map) = Int(min_zoom(tyler.provider))
 
 function get_zoom(tyler::Map, area)
     res = size(tyler.axis.scene) .* tyler.scale
-    clamp(z_index(area, (X=res[2], Y=res[1]), tyler.coordinate_system), min_zoom(tyler), max_zoom(tyler))
+    clamp(z_index(area, (X=res[2], Y=res[1]), tyler.crs), min_zoom(tyler), max_zoom(tyler))
 end
 
 function update_tiles!(tyler::Map, area::Union{Rect,Extent})
@@ -310,9 +324,9 @@ function update_tiles!(tyler::Map, area::Union{Rect,Extent})
     yspan = (area.Y[2] - area.Y[1]) * 0.01
     mouse_area = Extents.Extent(X=(xpos - xspan, xpos + xspan), Y=(ypos - yspan, ypos + yspan))
     # Make a halo around the mouse tile to load next, intersecting area so we don't download outside the plot
-    mouse_halo_area = grow(mouse_area, 10)
+    mouse_halo_area = grow_extent(mouse_area, 10)
     # Define a halo around the area to download last, so pan/zoom are filled already
-    halo_area = grow(area, tyler.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
+    halo_area = grow_extent(area, tyler.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
     # Define all the tiles in the order they will load in
     areas = if Extents.intersects(mouse_halo_area, area)
         mha = Extents.intersect(mouse_halo_area, area)
@@ -327,7 +341,7 @@ function update_tiles!(tyler::Map, area::Union{Rect,Extent})
 
     area_layers = map(layer_range) do z
         map(areas) do ext
-            MapTiles.TileGrid(ext, z, tyler.coordinate_system)
+            MapTiles.TileGrid(ext, z, tyler.crs)
         end |> Iterators.flatten
     end |> Iterators.flatten
 
@@ -357,8 +371,7 @@ function z_index(extent::Union{Rect,Extent}, res::NamedTuple, crs)
     return findmin(x -> abs(x - target_ntiles), tiles_at_z)[2]
 end
 
-# grow an extent
-function grow(area::Union{Rect,Extent}, factor)
+function grow_extent(area::Union{Rect,Extent}, factor)
     map(Extents.bounds(area)) do axis_bounds
         span = axis_bounds[2] - axis_bounds[1]
         pad = factor * span / 2
