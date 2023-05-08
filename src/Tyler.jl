@@ -6,7 +6,6 @@ import GeoInterface
 import GeometryBasics
 import HTTP
 import ImageMagick
-import LinearAlgebra
 import LRUCache
 import Makie
 import OrderedCollections
