@@ -28,7 +28,7 @@ buildings = buildings_from_file("london_buildings.osm");
 # Google + OSM
 provider = TileProviders.Google(:satelite)
 london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
-m = Tyler.Map(london; provider=provider, coordinate_system=Tyler.wgs84)
+m = Tyler.Map(london; provider=provider, crs=Tyler.wgs84)
 m.axis.aspect = map_aspect(area.minlat, area.maxlat)
 p = osmplot!(m.axis, osm; buildings)
 DataInspector(m.axis)
