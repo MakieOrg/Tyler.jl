@@ -63,7 +63,6 @@ struct Map
     downloaded_tiles::Channel{Tuple{Tile,TileImage}}
     display_task::Base.RefValue{Task}
     download_task::Base.RefValue{Task}
-    screen::Makie.MakieScreen
     depth::Int
     halo::Float64
     scale::Float64
@@ -88,7 +87,7 @@ end
 Base.showable(::MIME"image/png", ::Map) = true
 function Base.show(io::IO, m::MIME"image/png", map::Map)
     wait(map)
-    Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
+    Makie.show(io::IO, m, map.figure)
 end
 
 function Map(extent, extent_crs=wgs84;
@@ -108,13 +107,11 @@ function Map(extent, extent_crs=wgs84;
     free_tiles = Makie.Combined[]
     tiles_being_added = ThreadSafeDict{Tile,Task}()
     downloaded_tiles = Channel{Tuple{Tile,TileImage}}(128)
-    screen = display(figure; title="Tyler (with Makie)")
 
-    if isnothing(screen)
+    if ismissing(Makie.current_backend())
         error("please load either GLMakie or WGLMakie")
     end
     display_task = Base.RefValue{Task}()
-    nx, ny = cld.(size(screen), 256)
     download_task = Base.RefValue{Task}()
 
     # Extent
@@ -134,12 +131,12 @@ function Map(extent, extent_crs=wgs84;
         fetched_tiles,
         max_parallel_downloads, OrderedSet{Tile}(),
         tiles_being_added, downloaded_tiles,
-        display_task, download_task, screen,
+        display_task, download_task, 
         depth, halo, scale
     )
     tyler.zoom[] = get_zoom(tyler, extent)
     download_task[] = @async begin
-        while isopen(screen)
+        while true
             # we dont download all tiles at once, so when one download task finishes, we may want to schedule more downloads:
             if !isempty(tyler.queued_but_not_downloaded)
                 queue_tile!(tyler, popfirst!(tyler.queued_but_not_downloaded))
@@ -150,14 +147,10 @@ function Map(extent, extent_crs=wgs84;
         empty!(tyler.displayed_tiles)
     end
     display_task[] = @async begin
-        while isopen(screen)
+        while true
             tile, img = take!(downloaded_tiles)
             try
                 create_tile_plot!(tyler, tile, img)
-                # fixes on demand renderloop which doesn't pick up all updates!
-                if hasfield(typeof(tyler.screen), :requires_update)
-                    tyler.screen.requires_update = true
-                end
             catch e
                 @warn "error while creating tile" exception = (e, Base.catch_backtrace())
             end
@@ -168,7 +161,6 @@ function Map(extent, extent_crs=wgs84;
     update_tiles!(tyler, ext_target)
 
     on(axis.finallimits) do extent
-        isopen(screen) || return
         update_tiles!(tyler, extent)
         return
     end
