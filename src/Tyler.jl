@@ -60,9 +60,7 @@ struct Map
     # TODO, use Channel here
     queued_but_not_downloaded::OrderedSet{Tile}
     tiles_being_added::ThreadSafeDict{Tile,Task}
-    downloaded_tiles::Channel{Tuple{Tile,TileImage}}
-    display_task::Base.RefValue{Task}
-    download_task::Base.RefValue{Task}
+    downloaded_tiles::Channel{Tuple{Union{Nothing,Tile},Union{Nothing,TileImage}}}
     depth::Int
     halo::Float64
     scale::Float64
@@ -75,7 +73,15 @@ function Base.wait(map::Map)
             wait(last(first(map.tiles_being_added)))
         end
         if !isempty(map.queued_but_not_downloaded)
-            sleep(0.001) # we don't have a task to wait on, so we sleep
+           while true
+               # we dont download all tiles at once, so when one download task finishes, we may want to schedule more downloads:
+               if !isempty(map.queued_but_not_downloaded)
+                   queue_tile!(map, popfirst!(map.queued_but_not_downloaded))
+               else
+                   return
+               end
+               sleep(0.01)
+            end
         end
         # We're done if both are empty!
         if isempty(map.tiles_being_added) && isempty(map.queued_but_not_downloaded)
@@ -106,13 +112,11 @@ function Map(extent, extent_crs=wgs84;
     fetched_tiles = LRU{Tile, Matrix{RGB{N0f8}}}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
     free_tiles = Makie.Combined[]
     tiles_being_added = ThreadSafeDict{Tile,Task}()
-    downloaded_tiles = Channel{Tuple{Tile,TileImage}}(128)
+    downloaded_tiles = Channel{Tuple{Union{Nothing,Tile},Union{Nothing,TileImage}}}(128)
 
     if ismissing(Makie.current_backend())
         error("please load either GLMakie or WGLMakie")
     end
-    display_task = Base.RefValue{Task}()
-    download_task = Base.RefValue{Task}()
 
     # Extent
     # if extent input is a HyperRectangle then convert to type Extent
@@ -131,37 +135,25 @@ function Map(extent, extent_crs=wgs84;
         fetched_tiles,
         max_parallel_downloads, OrderedSet{Tile}(),
         tiles_being_added, downloaded_tiles,
-        display_task, download_task, 
         depth, halo, scale
     )
     tyler.zoom[] = get_zoom(tyler, extent)
-    download_task[] = @async begin
-        while true
-            # we dont download all tiles at once, so when one download task finishes, we may want to schedule more downloads:
-            if !isempty(tyler.queued_but_not_downloaded)
-                queue_tile!(tyler, popfirst!(tyler.queued_but_not_downloaded))
+    
+    # Queue tiles to be downloaded & displayed
+    update_tiles!(tyler, ext_target)
+    
+    on(axis.finallimits) do extent
+        update_tiles!(tyler, extent)        
+        for (tile,img) in downloaded_tiles
+            if isnothing(tile)
+                return
             end
-            sleep(0.01)
-        end
-        empty!(tyler.queued_but_not_downloaded)
-        empty!(tyler.displayed_tiles)
-    end
-    display_task[] = @async begin
-        while true
-            tile, img = take!(downloaded_tiles)
             try
                 create_tile_plot!(tyler, tile, img)
             catch e
                 @warn "error while creating tile" exception = (e, Base.catch_backtrace())
             end
         end
-    end
-
-    # Queue tiles to be downloaded & displayed
-    update_tiles!(tyler, ext_target)
-
-    on(axis.finallimits) do extent
-        update_tiles!(tyler, extent)
         return
     end
     return tyler
@@ -351,6 +343,7 @@ function update_tiles!(tyler::Map, area::Union{Rect,Extent})
 
     # Queue tiles to be downloaded & displayed
     foreach(tile -> queue_tile!(tyler, tile), to_add)
+    put!(tyler.downloaded_tiles, (nothing,nothing))
 end
 
 function z_index(extent::Union{Rect,Extent}, res::NamedTuple, crs)
@@ -377,8 +370,8 @@ function debug_tile!(map::Tyler.Map, tile::Tile)
 end
 
 function debug_tiles!(map::Tyler.Map)
-    for tile in m.displayed_tiles
-        debug_tile!(m, tile)
+    for tile in map.displayed_tiles
+        debug_tile!(map, tile)
     end
 end
 
