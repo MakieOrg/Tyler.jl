@@ -67,6 +67,7 @@ struct Map
     depth::Int
     halo::Float64
     scale::Float64
+    max_zoom::Int
 end
 
 # Wait for all tiles to be loaded
@@ -101,7 +102,8 @@ function Map(extent, extent_crs=wgs84;
     cache_size_gb=5,
     depth=8,
     halo=0.2,
-    scale=1.0
+    scale=1.0,
+    max_zoom=TileProviders.max_zoom(provider)
 )
 
     fetched_tiles = LRU{Tile, Matrix{RGB{N0f8}}}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
@@ -123,6 +125,7 @@ function Map(extent, extent_crs=wgs84;
     ext_target = MapTiles.project_extent(extent, extent_crs, crs)
     X = ext_target.X
     Y = ext_target.Y
+    @show Y
     axis.autolimitaspect = 1
     Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
 
@@ -135,7 +138,7 @@ function Map(extent, extent_crs=wgs84;
         max_parallel_downloads, OrderedSet{Tile}(),
         tiles_being_added, downloaded_tiles,
         display_task, download_task, screen,
-        depth, halo, scale
+        depth, halo, scale, max_zoom
     )
     tyler.zoom[] = get_zoom(tyler, extent)
     download_task[] = @async begin
@@ -298,7 +301,7 @@ function queue_tile!(tyler::Map, tile)
     end
 end
 
-TileProviders.max_zoom(tyler::Map) = Int(max_zoom(tyler.provider))
+TileProviders.max_zoom(tyler::Map) = tyler.max_zoom
 TileProviders.min_zoom(tyler::Map) = Int(min_zoom(tyler.provider))
 
 function get_zoom(tyler::Map, area)
