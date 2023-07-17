@@ -125,7 +125,6 @@ function Map(extent, extent_crs=wgs84;
     ext_target = MapTiles.project_extent(extent, extent_crs, crs)
     X = ext_target.X
     Y = ext_target.Y
-    @show Y
     axis.autolimitaspect = 1
     Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
 
