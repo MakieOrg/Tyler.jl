@@ -20,6 +20,7 @@ TileProviders = "263fe934-28e1-4ae9-998a-c2629c5fede6"
 
 [compat]
 julia = "1"
+GeometryBasics = "0.4.8"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
