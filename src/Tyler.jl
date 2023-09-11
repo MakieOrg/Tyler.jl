@@ -279,10 +279,6 @@ function queue_tile!(tyler::Map, tile)
     end
 end
 
-function Extents.extent(rect::Rect2)
-    (xmin, ymin), (xmax, ymax) = extrema(rect)
-    return Extent(X=(xmin, xmax), Y=(ymin, ymax))
-end
 
 TileProviders.max_zoom(tyler::Map) = Int(max_zoom(tyler.provider))
 TileProviders.min_zoom(tyler::Map) = Int(min_zoom(tyler.provider))
