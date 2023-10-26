@@ -331,9 +331,9 @@ function update_tiles!(tyler::Map, area::Union{Rect,Extent})
     halo_area = grow_extent(area, tyler.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
     # Define all the tiles in the order they will load in
     areas = if Extents.intersects(mouse_halo_area, area)
-        mha = Extents.intersect(mouse_halo_area, area)
+        mha = Extents.intersection(mouse_halo_area, area)
         if Extents.intersects(mouse_area, area)
-            [Extents.intersect(mouse_area, area), mha, area, halo_area]
+            [Extents.intersection(mouse_area, area), mha, area, halo_area]
         else
             [mha, area, halo_area]
         end
