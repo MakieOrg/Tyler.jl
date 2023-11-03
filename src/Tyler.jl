@@ -179,11 +179,7 @@ end
 
 GeoInterface.crs(tyler::Map) = tyler.crs
 Extents.extent(tyler::Map) = Extents.extent(tyler.axis.finallimits[])
-# FIXME: this is type pyracy, it should be in GeometryBasics.jl
-function Extents.extent(rect::Rect2)
-    (xmin, ymin), (xmax, ymax) = extrema(rect)
-    return Extent(X=(xmin, xmax), Y=(ymin, ymax))
-end
+
 
 function stop_download!(map::Map, tile::Tile)
     # delete!(map.tiles_being_added, tile)
