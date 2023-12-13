@@ -219,7 +219,7 @@ function create_tileplot!(axis, image)
     map!(uv -> Vec2f(uv[1], 1 - uv[2]), uv, uv)
     m = GeometryBasics.Mesh(meta(points; uv=uv), faces)
     # Plot directly into scene to not update limits
-    return mesh!(axis.scene, m; color=image, shading=false, inspectable=false)
+    return mesh!(axis.scene, m; color=image, shading=Makie.NoShading, inspectable=false)
 end
 
 function place_tile!(tile::Tile, plot, crs)
