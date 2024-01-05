@@ -63,7 +63,6 @@ struct Map
     downloaded_tiles::Channel{Tuple{Tile,TileImage}}
     display_task::Base.RefValue{Task}
     download_task::Base.RefValue{Task}
-    screen::Makie.MakieScreen
     depth::Int
     halo::Float64
     scale::Float64
@@ -89,12 +88,35 @@ end
 Base.showable(::MIME"image/png", ::Map) = true
 function Base.show(io::IO, m::MIME"image/png", map::Map)
     wait(map)
-    Makie.backend_show(map.screen, io::IO, m, map.figure.scene)
+    Makie.show(io, m, map.figure)
+end
+
+function stopped_displaying(screen::Makie.MakieScreen)
+    Backend = parentmodule(typeof(screen))
+    if nameof(Backend) == :WGLMakie
+        session = Backend.get_screen_session(screen)
+        isnothing(session) && return false
+        !isready(session) && return false
+        return !isopen(session)
+    elseif nameof(Backend) == :GLMakie
+        return !isopen(screen)
+    else
+        error("Unsupported backend: $(Backend)")
+    end
+end
+
+function stopped_displaying(fig::Figure)
+    scene = Makie.get_scene(fig)
+    screen = Makie.getscreen(scene)
+    # if not displayed yet, we return true, since we're using
+    # is_open as a condition in our while loop to stop once it got displayed & closed
+    isnothing(screen) && return false
+    return stopped_displaying(screen)
 end
 
 function Map(extent, extent_crs=wgs84;
     resolution=(1000, 1000),
-    figure=Makie.Figure(; resolution),
+    figure=Makie.Figure(; size=resolution),
     axis=Makie.Axis(figure[1, 1]; aspect=Makie.DataAspect()),
     provider=TileProviders.OpenStreetMap(:Mapnik),
     crs=MapTiles.web_mercator,
@@ -110,13 +132,8 @@ function Map(extent, extent_crs=wgs84;
     free_tiles = Makie.Combined[]
     tiles_being_added = ThreadSafeDict{Tile,Task}()
     downloaded_tiles = Channel{Tuple{Tile,TileImage}}(128)
-    screen = display(figure; title="Tyler (with Makie)")
 
-    if isnothing(screen)
-        error("please load either GLMakie or WGLMakie")
-    end
     display_task = Base.RefValue{Task}()
-    nx, ny = cld.(size(screen), 256)
     download_task = Base.RefValue{Task}()
 
     # Extent
@@ -136,12 +153,12 @@ function Map(extent, extent_crs=wgs84;
         fetched_tiles,
         max_parallel_downloads, OrderedSet{Tile}(),
         tiles_being_added, downloaded_tiles,
-        display_task, download_task, screen,
+        display_task, download_task,
         depth, halo, scale, max_zoom
     )
     tyler.zoom[] = get_zoom(tyler, extent)
     download_task[] = @async begin
-        while isopen(screen)
+        while !stopped_displaying(figure)
             # we dont download all tiles at once, so when one download task finishes, we may want to schedule more downloads:
             if !isempty(tyler.queued_but_not_downloaded)
                 queue_tile!(tyler, popfirst!(tyler.queued_but_not_downloaded))
@@ -150,27 +167,36 @@ function Map(extent, extent_crs=wgs84;
         end
         empty!(tyler.queued_but_not_downloaded)
         empty!(tyler.displayed_tiles)
+        @debug("stopped download task")
     end
     display_task[] = @async begin
-        while isopen(screen)
+        while !stopped_displaying(figure)
+            while isnothing(Makie.getscreen(tyler.axis.scene))
+                sleep(0.01)
+            end
+            screen = Makie.getscreen(tyler.axis.scene)
+            while !isopen(screen)
+                sleep(0.01)
+            end
             tile, img = take!(downloaded_tiles)
             try
                 create_tile_plot!(tyler, tile, img)
                 # fixes on demand renderloop which doesn't pick up all updates!
-                if hasfield(typeof(tyler.screen), :requires_update)
-                    tyler.screen.requires_update = true
+                if hasproperty(screen, :requires_update)
+                    screen.requires_update = true
                 end
             catch e
                 @warn "error while creating tile" exception = (e, Base.catch_backtrace())
             end
         end
+        @debug("stopped display task")
     end
 
     # Queue tiles to be downloaded & displayed
     update_tiles!(tyler, ext_target)
 
-    on(axis.finallimits) do extent
-        isopen(screen) || return
+    on(axis.scene, axis.finallimits) do extent
+        stopped_displaying(figure) && return
         update_tiles!(tyler, extent)
         return
     end
@@ -179,7 +205,6 @@ end
 
 GeoInterface.crs(tyler::Map) = tyler.crs
 Extents.extent(tyler::Map) = Extents.extent(tyler.axis.finallimits[])
-
 
 function stop_download!(map::Map, tile::Tile)
     # delete!(map.tiles_being_added, tile)
@@ -234,7 +259,7 @@ end
 function create_tile_plot!(tyler::Map, tile::Tile, image::TileImage)
     if haskey(tyler.plots, tile)
         # this shouldn't get called with plots that are already displayed
-        @warn "getting tile plot already plotted"
+        @debug "getting tile plot already plotted"
         return tyler.plots[tile]
     end
     if isempty(tyler.free_tiles)
@@ -317,7 +342,7 @@ function update_tiles!(tyler::Map, area::Union{Rect,Extent})
     # And the z layers we will plot
     layer_range = max(min_zoom(tyler), zoom - depth):zoom
     # Get the tiles around the mouse first
-    xpos, ypos = mouse_pos = Makie.mouseposition(tyler.axis.scene)
+    xpos, ypos = Makie.mouseposition(tyler.axis.scene)
     xspan = (area.X[2] - area.X[1]) * 0.01
     yspan = (area.Y[2] - area.Y[1]) * 0.01
     mouse_area = Extents.Extent(X=(xpos - xspan, xpos + xspan), Y=(ypos - yspan, ypos + yspan))
