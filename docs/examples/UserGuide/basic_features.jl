@@ -22,7 +22,7 @@ delta = 1;
 extent = Extent(X = (lon - delta/2, lon + delta/2), Y = (lat-delta/2, lat+delta/2));
 
 ## show map
-m = Tyler.Map(extent; provider, figure=Figure(resolution=(1000, 600)))
+m = Tyler.Map(extent; provider, figure=Figure(; size=(1000, 600)))
 ## wait for tiles to fully load
 wait(m)
 
