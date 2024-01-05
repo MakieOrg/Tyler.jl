@@ -24,7 +24,7 @@ provider = TileProviders.Esri(:WorldImagery);
 
 ## Greenland extent
 extent = Extent(X = (-54., -48.), Y = (68.8, 72.5));
-        
+
 ## extract data
 cnt = [length(foo) for foo in df.X];
 X =  reduce(vcat,df.X);
@@ -61,25 +61,26 @@ hidespines!(m.axis);
 
 ## wait for tiles to fully load
 wait(m)
+m.figure
 #
 
 ## ------ uncomment to create interactive-animated figure -----
 ## The Documenter does not allow creations of interactive plots
 
-## loop to create animation 
-# if interactive 
-#     for k = 1:15 
+## loop to create animation
+# if interactive
+#     for k = 1:15
 #         # reset apha
 #         alpha[:] = zeros(nc);
 #         cmap[] = Colors.alphacolor.(cmap[], alpha)
 #
-#         for i in 2:1:n 
+#         for i in 2:1:n
 #             # modify alpha
 #             alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5);
 #             alpha[maximum([1,round(Int64,i*nc/n)])] = 1;
 #             cmap[] = Colors.alphacolor.(cmap[], alpha);
 #             sleep(0.001);
-#         end 
+#         end
 #     end
 # end
 ## -----------------------------------------------------------
@@ -90,5 +91,3 @@ wait(m)
 #       Contact person: Alex Gardner & Chad Greene
 
 # <video src="https://github.com/JuliaGeo/JuliaGeoData/raw/main/assets/videos/iceloss.mp4" width="400" />
-
-
