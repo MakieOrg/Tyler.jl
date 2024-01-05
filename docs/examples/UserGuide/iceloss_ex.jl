@@ -9,11 +9,9 @@ using Extents
 using Colors
 using Dates
 using HTTP
+GLMakie.activate!()
 
 url = "https://github.com/JuliaGeo/JuliaGeoData/blob/365a09596bfca59e0977c20c2c2f566c0b29dbaa/assets/data/iceloss_subset.arrow?raw=true";
-
-## parameter for scaling figure size
-scale = 1;
 
 ## load ice loss data [courtesy of Chad Greene @ JPL]
 resp = HTTP.get(url);
@@ -42,7 +40,7 @@ cmap = Colors.alphacolor.(Makie.to_colormap(:thermal), alpha);
 cmap = Observable(cmap);
 
 ## show map
-m = Tyler.Map(extent; provider, figure=Figure(resolution=(1912 * scale, 2284 * scale)));
+m = Tyler.Map(extent; provider, figure=Figure(; size=(700,600)));
 
 ## create initial scatter plot
 scatter!(m.axis, X, Y; color = Z, colormap = cmap, colorrange = [0, n], markersize = 10);
@@ -51,7 +49,8 @@ scatter!(m.axis, X, Y; color = Z, colormap = cmap, colorrange = [0, n], markersi
 a,b = extrema(df.Date);
 a = year(a);
 b = year(b);
-Colorbar(m.figure[1,2]; colormap = cmap, colorrange = [a,b], ticklabelsize = 50 * scale, width = 100 * scale);
+Colorbar(m.figure[1,2]; colormap = cmap, colorrange = [a,b],
+    height=Relative(0.5), width = 15);
 
 ## hide ticks, grid and lables
 hidedecorations!(m.axis);
@@ -61,23 +60,29 @@ hidespines!(m.axis);
 
 ## wait for tiles to fully load
 wait(m)
-#
 
-record(m.figure, "iceloss.mp4", framerate=24) do io
-    for k = 1:15 
-        # reset apha
-        alpha[:] = zeros(nc);
-        cmap[] = Colors.alphacolor.(cmap[], alpha)
+## ------ uncomment to create interactive-animated figure -----
+## The Documenter does not allow creations of interactive plots
 
-        for i in 2:10:n 
-            # modify alpha
-            alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5)
-            alpha[maximum([1,round(Int64,i*nc/n)])] = 1
-            cmap[] = Colors.alphacolor.(cmap[], alpha)
-            recordframe!(io)  # record a new frame
-        end 
-    end
-end
+# loop to create animation 
+#=
+# if interactive 
+#     for k = 1:15 
+#         # reset apha
+#         alpha[:] = zeros(nc);
+#         cmap[] = Colors.alphacolor.(cmap[], alpha)
+#         for i in 2:1:n 
+#             # modify alpha
+#             alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5);
+#             alpha[maximum([1,round(Int64,i*nc/n)])] = 1;
+#             cmap[] = Colors.alphacolor.(cmap[], alpha);
+#             sleep(0.001);
+#         end 
+#     end
+# end
+=#
+
+# -----------------------------------------------------------
 
 # !!! info
 #       Ice loss from the Greenland Ice Sheet: 1972-2022.
@@ -85,5 +90,3 @@ end
 #       Contact person: Alex Gardner & Chad Greene
 
 # <video src="https://github.com/JuliaGeo/JuliaGeoData/raw/main/assets/videos/iceloss.mp4" width="400" />
-
-# ![type:video](iceloss.mp4)
