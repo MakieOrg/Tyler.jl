@@ -63,26 +63,21 @@ hidespines!(m.axis);
 wait(m)
 #
 
-## ------ uncomment to create interactive-animated figure -----
-## The Documenter does not allow creations of interactive plots
+record(m.figure, "iceloss.mp4", framerate=24) do io
+    for k = 1:15 
+        # reset apha
+        alpha[:] = zeros(nc);
+        cmap[] = Colors.alphacolor.(cmap[], alpha)
 
-## loop to create animation 
-# if interactive 
-#     for k = 1:15 
-#         # reset apha
-#         alpha[:] = zeros(nc);
-#         cmap[] = Colors.alphacolor.(cmap[], alpha)
-#
-#         for i in 2:1:n 
-#             # modify alpha
-#             alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5);
-#             alpha[maximum([1,round(Int64,i*nc/n)])] = 1;
-#             cmap[] = Colors.alphacolor.(cmap[], alpha);
-#             sleep(0.001);
-#         end 
-#     end
-# end
-## -----------------------------------------------------------
+        for i in 2:10:n 
+            # modify alpha
+            alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5)
+            alpha[maximum([1,round(Int64,i*nc/n)])] = 1
+            cmap[] = Colors.alphacolor.(cmap[], alpha)
+            recordframe!(io)  # record a new frame
+        end 
+    end
+end
 
 # !!! info
 #       Ice loss from the Greenland Ice Sheet: 1972-2022.
@@ -91,4 +86,4 @@ wait(m)
 
 # <video src="https://github.com/JuliaGeo/JuliaGeoData/raw/main/assets/videos/iceloss.mp4" width="400" />
 
-
+# ![type:video](iceloss.mp4)
