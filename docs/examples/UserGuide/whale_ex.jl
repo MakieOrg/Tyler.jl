@@ -31,7 +31,7 @@ provider = TileProviders.NASAGIBS(:ViirsEarthAtNight2012)
 
 set_theme!(theme_black())
 m = Tyler.Map(Rect2f(Rect2f(lomn - δlon/2, lamn-δlat/2, 2δlon, 2δlat));
-    provider, figure=Figure(resolution=(1000, 600)))
+    provider, figure=Figure(; size=(1000, 600)))
 wait(m)
 
 nt = 30
