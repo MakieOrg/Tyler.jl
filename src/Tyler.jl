@@ -72,7 +72,7 @@ end
 # Wait for all tiles to be loaded
 function Base.wait(map::Map)
     # The download loops need a screen to do their work!
-    if !isempty(map.figure.scene.current_screens)
+    if isnothing(Makie.getscreen(map.figure.scene))
         display(map.figure)
     end
     while true
