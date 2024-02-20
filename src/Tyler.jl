@@ -71,6 +71,10 @@ end
 
 # Wait for all tiles to be loaded
 function Base.wait(map::Map)
+    # The download loops need a screen to do their work!
+    if !isempty(map.figure.scene.current_screens)
+        display(map.figure)
+    end
     while true
         if !isempty(map.tiles_being_added)
             wait(last(first(map.tiles_being_added)))
