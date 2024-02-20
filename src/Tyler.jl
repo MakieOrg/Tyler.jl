@@ -71,10 +71,12 @@ end
 
 # Wait for all tiles to be loaded
 function Base.wait(map::Map)
-    # The download loops need a screen to do their work!
+    # The download + plot loops need a screen to do their work!
     if isnothing(Makie.getscreen(map.figure.scene))
         display(map.figure)
     end
+    screen = Makie.getscreen(map.figure.scene)
+    isnothing(screen) && error("No screen after display. Wrong backend? Only WGLMakie and GLMakie are supported.")
     while true
         if !isempty(map.tiles_being_added)
             wait(last(first(map.tiles_being_added)))
@@ -84,6 +86,9 @@ function Base.wait(map::Map)
         end
         # We're done if both are empty!
         if isempty(map.tiles_being_added) && isempty(map.queued_but_not_downloaded)
+            while !isempty(map.downloaded_tiles)
+                sleep(0.01)
+            end
             return map
         end
     end
@@ -128,7 +133,7 @@ function Map(extent, extent_crs=wgs84;
     cache_size_gb=5,
     depth=8,
     halo=0.2,
-    scale=1.0,
+    scale=2.0,
     max_zoom=TileProviders.max_zoom(provider)
 )
 
