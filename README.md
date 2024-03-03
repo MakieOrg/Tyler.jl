@@ -1,20 +1,18 @@
-# Tyler
-
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://makieorg.github.io/Tyler.jl/blob/main/LICENSE)
 [![Latest Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://makieorg.github.io/Tyler.jl/dev/)
 [![Downloads](https://shields.io/endpoint?url=https://pkgs.genieframework.com/api/v1/badge/Tyler&label=Downloads)](https://pkgs.genieframework.com?packages=Tyler)
-
-<img src="/docs/src/assets/logo.png" align="right" style="padding-left:10px;" width="180"/>
 
 ## What is Tyler.jl ?
 
 [Tyler.jl](https://makieorg.github.io/Tyler.jl/dev/) is package for displaying tiled maps interactively, with [Makie.jl](https://github.com/MakieOrg/Makie.jl).
 
+<img src="/docs/src/assets/logo.png" align="right" style="padding-left:10px;" width="200"/>
+
 > [!TIP]
 > Visit the latest documentation at https://makieorg.github.io/Tyler.jl/dev/
 
 > [!IMPORTANT]
-> Become a Sponsor. Support this project.
+> Become a Sponsor. [Support](https://makie.org/support/) this project.
 
 ## Install
 
