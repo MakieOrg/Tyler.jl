@@ -17,7 +17,10 @@ hero:
     - theme: alt
       text: View on Github
       link: https://github.com/MakieOrg/Tyler.jl
-
+    - theme: brand
+      text: Become a Sponsor
+      link: https://makie.org/support/
+      
 features:
   - title: TileProviders
     details: A large collection of tile providers.
