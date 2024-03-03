@@ -1,27 +1,28 @@
-using Documenter, DocumenterMarkdown
-using Tyler, MapTiles, GLMakie, TileProviders
+using Documenter, DocumenterVitepress
+using Tyler
 
-makedocs(
+makedocs(;
+    sitename="Tyler",
     modules=[Tyler],
     clean=true,
     doctest=true,
-    #format   = Documenter.HTML(prettyurls = get(ENV, "CI", nothing) == "true"),
-    sitename="Tyler.jl",
     authors="Simon Danisch et al.",
-    strict=[
-        :doctest,
-        :linkcheck,
-        :parse_error,
-        :example_block,
-        # Other available options are
-        # :autodocs_block, :cross_references, :docs_block, :eval_block, :example_block,
-        # :footnote, :meta_block, :missing_docs, :setup_block
-    ], checkdocs=:all, format=Markdown(), draft=false,
-    build=joinpath(@__DIR__, "docs")
+    checkdocs=:all,
+    format=DocumenterVitepress.MarkdownVitepress(
+        repo = "github.com/MakieOrg/Tyler.jl", # this must be the full URL!
+        devbranch="master",
+        devurl="dev";
+    ),
+    draft=false,
+    source="src", 
+    build="build", 
+    warnonly=true,
 )
 
-deploydocs(; repo="github.com/MakieOrg/Tyler.jl.git", push_preview=true,
-    deps=Deps.pip("mkdocs", "pygments", "python-markdown-math", "mkdocs-material",
-        "pymdown-extensions", "mkdocstrings", "mknotebooks",
-        "pytkdocs_tweaks", "mkdocs_include_exclude_files", "jinja2", "mkdocs-video"),
-    make=() -> run(`mkdocs build`), target="site", devbranch="master")
+deploydocs(;
+    repo="github.com/MakieOrg/Tyler.jl.git",
+    target="build", # this is where Vitepress stores its output
+    branch = "gh-pages",
+    devbranch="master",
+    push_preview = true
+)

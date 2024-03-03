@@ -1,29 +1,27 @@
-# Tyler.jl
+```@raw html
+---
+# https://vitepress.dev/reference/default-theme-home-page
+layout: home
 
-A package for downloading map tiles on demand from different data source providers.
+hero:
+  name: "Tyler.jl"
+  text: "Maps"
+  tagline: Download Map Tiles on Demand
+  image:
+    src: /logo.png
+    alt: Tyler
+  actions:
+    - theme: brand
+      text: Getting Started
+      link: /getting_started
+    - theme: alt
+      text: View on Github
+      link: https://github.com/MakieOrg/Tyler.jl
 
-!!! info
-    - This package is currently in the initial phase of development.
-
-## Installation
-
-In the Julia REPL type:
-
-```julia
-using Pkg
-Pkg.add(["https://github.com/JuliaGeo/TileProviders.jl", "https://github.com/JuliaGeo/MapTiles.jl", "https://github.com/MakieOrg/Tyler.jl.git"])
-```
-
-or
-
-```julia
-] add https://github.com/JuliaGeo/TileProviders.jl https://github.com/JuliaGeo/MapTiles.jl https://github.com/MakieOrg/Tyler.jl.git
-```
-
-The `]` character starts the Julia [package manager](https://docs.julialang.org/en/v1/stdlib/Pkg/). Hit backspace key to return to Julia prompt.
-
-## API
-
-```@autodocs
-Modules = [Tyler]
+features:
+  - title: TileProviders
+    details: A large collection of tile providers.
+  - title: Makie intergration
+    details: Well integrated with the Makie ecosystem.
+---
 ```
