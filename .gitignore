@@ -11,3 +11,4 @@ docs/site
 docs/build
 docs/var
 deps/build.jl
+node_modules
