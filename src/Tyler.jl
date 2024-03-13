@@ -46,12 +46,12 @@ downloading and plotting more tiles as you zoom and pan.
 -`scale`: a tile scaling factor. Low number decrease the downloads but reduce the resolution.
     The default is `1.0`.
 """
-struct Map
+struct Map{A<:Makie.AbstractAxis}
     provider::AbstractProvider
     crs::CoordinateReferenceSystemFormat
     zoom::Observable{Int}
     figure::Figure
-    axis::Axis
+    axis::A
     displayed_tiles::OrderedSet{Tile}
     plots::Dict{Tile,Any}
     free_tiles::Vector{Makie.Combined}
@@ -152,6 +152,7 @@ function Map(extent, extent_crs=wgs84;
     X = ext_target.X
     Y = ext_target.Y
     axis.autolimitaspect = 1
+    @show X[1], X[2]
     Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
 
     plots = Dict{Tile,Any}()
@@ -202,9 +203,11 @@ function Map(extent, extent_crs=wgs84;
     end
 
     # Queue tiles to be downloaded & displayed
+    @show ext_target
     update_tiles!(tyler, ext_target)
 
     on(axis.scene, axis.finallimits) do extent
+        @show extent
         stopped_displaying(figure) && return
         update_tiles!(tyler, extent)
         return
@@ -283,6 +286,8 @@ function create_tile_plot!(tyler::Map, tile::Tile, image::TileImage)
 end
 
 function fetch_tile(tyler::Map, tile::Tile)
+    #println("Fetching Tile")
+    #@show tile
     return get!(tyler.fetched_tiles, tile) do
         fetch_tile(tyler.provider, tile)
     end
@@ -339,6 +344,7 @@ function get_zoom(tyler::Map, area)
 end
 
 function update_tiles!(tyler::Map, area::Union{Rect,Extent})
+    @show area
     area = typeof(area) <: Rect ? Extents.extent(area) : area
     # `depth` determines the number of layers below the current
     # layer to load. Tiles are downloaded in order from lowest to highest zoom.
@@ -346,6 +352,7 @@ function update_tiles!(tyler::Map, area::Union{Rect,Extent})
 
     # Calculate the zoom level
     zoom = get_zoom(tyler, area)
+    @show zoom
     tyler.zoom[] = zoom
 
     # And the z layers we will plot
