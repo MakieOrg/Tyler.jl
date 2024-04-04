@@ -13,3 +13,5 @@ docs/var
 deps/build.jl
 node_modules
 docs/package-lock.json
+*.osm
+london_drive.json
