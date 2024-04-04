@@ -121,4 +121,6 @@ for k = 1:15
 end
 ````
 
+```@raw html
 <video src="https://github.com/JuliaGeo/JuliaGeoData/raw/main/assets/videos/iceloss.mp4" controls="controls" autoplay="autoplay" ></video>
+```
