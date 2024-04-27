@@ -1,7 +1,7 @@
 [![Stable Docs](https://img.shields.io/badge/docs-stable-blue.svg)](https://makieorg.github.io/Tyler.jl/stable/)
 [![Latest Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://makieorg.github.io/Tyler.jl/dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://makieorg.github.io/Tyler.jl/blob/main/LICENSE)
-[![Downloads](https://shields.io/endpoint?url=https://pkgs.genieframework.com/api/v1/badge/Tyler&label=Downloads)](https://pkgs.genieframework.com?packages=Tyler)
+[![Downloads](https://img.shields.io/badge/dynamic/json?url=http%3A%2F%2Fjuliapkgstats.com%2Fapi%2Fv1%2Fmonthly_downloads%2FTyler&query=total_requests&suffix=%2Fmonth&label=Downloads)](http://juliapkgstats.com/pkg/Tyler)
 
 ## What is Tyler.jl ?
 
