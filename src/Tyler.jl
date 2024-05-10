@@ -8,7 +8,7 @@ using HTTP: HTTP
 using ImageMagick: ImageMagick
 using LRUCache: LRUCache, LRU
 using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
-using Makie: Makie, Observable, Figure, Axis, RGBAf, on, isopen, meta, mesh!, translate!, scale!
+using Makie: Makie, Observable, Figure, Axis, RGBAf, on, isopen, linesegments!, meta, mesh!, translate!, scale!
 using OrderedCollections: OrderedCollections, OrderedSet
 using ThreadSafeDicts: ThreadSafeDicts, ThreadSafeDict
 using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
@@ -46,12 +46,12 @@ downloading and plotting more tiles as you zoom and pan.
 -`scale`: a tile scaling factor. Low number decrease the downloads but reduce the resolution.
     The default is `1.0`.
 """
-struct Map
+struct Map{A<:Makie.AbstractAxis}
     provider::AbstractProvider
     crs::CoordinateReferenceSystemFormat
     zoom::Observable{Int}
     figure::Figure
-    axis::Axis
+    axis::A
     displayed_tiles::OrderedSet{Tile}
     plots::Dict{Tile,Any}
     free_tiles::Vector{Makie.Combined}
@@ -153,7 +153,6 @@ function Map(extent, extent_crs=wgs84;
     Y = ext_target.Y
     axis.autolimitaspect = 1
     Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
-
     plots = Dict{Tile,Any}()
     tyler = Map(
         provider, crs,
@@ -283,6 +282,7 @@ function create_tile_plot!(tyler::Map, tile::Tile, image::TileImage)
 end
 
 function fetch_tile(tyler::Map, tile::Tile)
+    #println("Fetching Tile")
     return get!(tyler.fetched_tiles, tile) do
         fetch_tile(tyler.provider, tile)
     end
@@ -417,8 +417,8 @@ function debug_tile!(map::Tyler.Map, tile::Tile)
 end
 
 function debug_tiles!(map::Tyler.Map)
-    for tile in m.displayed_tiles
-        debug_tile!(m, tile)
+    for tile in map.displayed_tiles
+        debug_tile!(map, tile)
     end
 end
 
