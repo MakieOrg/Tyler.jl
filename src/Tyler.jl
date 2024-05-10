@@ -271,7 +271,7 @@ function place_tile!(tile::Tile, plot, crs)
     xmin, xmax = bounds.X
     ymin, ymax = bounds.Y
     translate!(plot, xmin, ymin, tile.z - 100)
-    scale!(plot, xmax - xmin, ymax - ymin, 0)
+    scale!(plot, xmax - xmin, ymax - ymin, 1)
     return
 end
 
