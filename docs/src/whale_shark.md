@@ -102,4 +102,6 @@ set_theme!() # reset theme (default)
 
 ````
 
+```@raw html
 <video src="./whale_shark_128786.mp4" controls="controls" autoplay="autoplay"></video>
+```

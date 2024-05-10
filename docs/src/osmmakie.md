@@ -1,4 +1,10 @@
-using Tyler, GLMakie, OSMMakie, LightOSM, TileProviders
+## OpenStreetMap data (OSM) 
+
+In this example, we combine OpenStreetMap data, loading some roads and buildings and plotting them on top of a Tyler map.
+
+````@example osm
+using Tyler, Tyler.TileProviders
+using GLMakie, OSMMakie, LightOSM
 
 area = (
     minlat = 51.50, minlon = -0.0921, # bottom left corner
@@ -31,5 +37,7 @@ london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
 m = Tyler.Map(london; provider=provider, crs=Tyler.wgs84)
 m.axis.aspect = map_aspect(area.minlat, area.maxlat)
 p = osmplot!(m.axis, osm; buildings)
-DataInspector(m.axis)
+# DataInspector(m.axis) # this is broken/slow
 wait(m)
+
+````

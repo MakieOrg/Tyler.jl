@@ -41,6 +41,7 @@ export default defineConfig({
       { text: 'Examples',
       items: [
         { text: 'Points, Poly & text', link: '/points_poly_text' },
+        { text: 'OpenStreetMap data', link: '/osmmakie' },
         { text: 'Whale shark trajectory', link: '/whale_shark' },
         { text: 'Ice loss animation', link: '/iceloss_ex' },
         { text: 'Interpolation On The Fly', link: '/interpolation' },
@@ -55,6 +56,7 @@ export default defineConfig({
         text: 'Getting Started', link: '/getting_started',
         items: [
           { text: 'Points, Poly & text', link: '/points_poly_text' },
+          { text: 'OpenStreetMap data', link: '/osmmakie' },
           { text: 'Whale shark trajectory', link: '/whale_shark' },
           { text: 'Ice loss animation', link: '/iceloss_ex' },
           { text: 'Interpolation On The Fly', link: '/interpolation' },

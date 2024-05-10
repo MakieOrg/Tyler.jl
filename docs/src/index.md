@@ -24,7 +24,7 @@ hero:
 features:
   - title: TileProviders
     details: A large collection of tile providers.
-  - title: Makie intergration
+  - title: Makie integration
     details: Well integrated with the Makie ecosystem.
 ---
 ```
