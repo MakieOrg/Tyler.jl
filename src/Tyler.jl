@@ -51,10 +51,10 @@ struct Map
     crs::CoordinateReferenceSystemFormat
     zoom::Observable{Int}
     figure::Figure
-    axis::Axis
+    axis
     displayed_tiles::OrderedSet{Tile}
     plots::Dict{Tile,Any}
-    free_tiles::Vector{Makie.Combined}
+    free_tiles::Vector{Makie.Plot}
     fetched_tiles::LRU{Tile,TileImage}
     max_parallel_downloads::Int
     # TODO, use Channel here
@@ -151,8 +151,13 @@ function Map(extent, extent_crs=wgs84;
     ext_target = MapTiles.project_extent(extent, extent_crs, crs)
     X = ext_target.X
     Y = ext_target.Y
-    axis.autolimitaspect = 1
-    Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
+    if axis isa Axis
+        axis.autolimitaspect = 1
+        Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
+    elseif axis isa Makie.Axis3
+        Makie.xlims!(axis, (X[1], X[2]))
+        Makie.ylims!(axis, (Y[1], Y[2]))
+    end
 
     plots = Dict{Tile,Any}()
     tyler = Map(
@@ -204,16 +209,21 @@ function Map(extent, extent_crs=wgs84;
     # Queue tiles to be downloaded & displayed
     update_tiles!(tyler, ext_target)
 
-    on(axis.scene, axis.finallimits) do extent
-        stopped_displaying(figure) && return
-        update_tiles!(tyler, extent)
-        return
+    if axis isa Union{Makie.Axis, Makie.Axis3} 
+        on(axis.scene, axis.finallimits) do extent
+            stopped_displaying(figure) && return
+            update_tiles!(tyler, extent)
+            return
+        end
+    else
+        # we can't hook it up so don't do anything.
+        # the user can zoom manually using `update_tiles!`.
     end
     return tyler
 end
 
 GeoInterface.crs(tyler::Map) = tyler.crs
-Extents.extent(tyler::Map) = Extents.extent(tyler.axis.finallimits[])
+Extents.extent(tyler::Map) = Extents.extent(Makie.Rect2d(tyler.axis.finallimits[]))
 
 function stop_download!(map::Map, tile::Tile)
     # delete!(map.tiles_being_added, tile)
