@@ -43,7 +43,7 @@ end
     @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; size = (1000, 1000))
     @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; res = 0.001)
     x, y, img = Tyler.basemap(Tyler.TileProviders.Google(), london, (1000, 1000))
-    @test img isa Matrix{<: RGBA}
+    @test img isa Matrix{<: Makie.RGBA}
 end
 
 # Reference tests?
