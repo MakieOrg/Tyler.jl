@@ -23,7 +23,7 @@ function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Re
     bbox = Extents.extent(boundingbox)
     # First, handle keyword arguments
     @assert (isnothing(size) || isnothing(res)) "You must provide either `size` or `res`, but not both."
-    @assert (isnothing(size) && isnothing(res)) "You must provide either the `size` or `res` keywords."
+    @assert !(isnothing(size) && isnothing(res)) "You must provide either the `size` or `res` keywords.  Current values: $(size), $(res)"
     _size = if isnothing(size) 
         # convert resolution to size using bbox and round(Int, x)
         (round(Int, (bbox.X[2] - bbox.X[1]) / first(res)), round(Int, (bbox.Y[2] - bbox.Y[1]) / last(res)))
