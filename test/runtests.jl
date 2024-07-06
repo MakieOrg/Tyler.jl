@@ -38,6 +38,14 @@ m = wait(Tyler.Map(london; scale=1)) # waits until all tiles are displayed
     @test GeoInterface.crs(m) == Tyler.MapTiles.WebMercator()
 end
 
+@testset "Basemap" begin
+    @test_nowarn basemap(TileProviders.Google(), london, (1000, 1000))
+    @test_nowarn basemap(TileProviders.Google(), london; size = (1000, 1000))
+    @test_nowarn basemap(TileProviders.Google(), london; res = 0.001)
+    x, y, img = basemap(TileProviders.Google(), london, (1000, 1000))
+    @test img isa Matrix{<: RGBA}
+end
+
 # Reference tests?
 # provider = TileProviders.NASAGIBS()
 # m = Tyler.Map(Rect2f(0, 50, 40, 20), 5; provider=provider, min_tiles=8, max_tiles=32)
