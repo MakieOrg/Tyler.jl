@@ -42,6 +42,12 @@ function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Re
     # Compute the dimensions of the tile grid, so we can feed them into a 
     # Raster later.
     tilegrid_extent = Extents.extent(tilegrid, MapTiles.WGS84())
+    #= TODO:
+    Here we assume all tiles are 256x256.  
+    It's easy to compute this though, by either:
+    - Making a sample query for the tile (0, 0, 0) (but you are not guaranteed this exists)
+    =#
+    tile_widths = (256, 256)
     tilegrid_size = tile_widths .* length.(tilegrid.grid.indices)
     # We need to know the start and end indices of the tile grid, so we can 
     # place the tiles in the right place.
@@ -75,10 +81,7 @@ function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Re
     end
     # Now, we have a complete image.
     # We can also produce the image's axes:
-    xs = (..)(tilegrid_extent.X...)
-    ys = (..)(tilegrid_extent.Y...)
-    # image(ras; axis = (; aspect = DataAspect()))
-    return (xs, ys, image_receptacle)
+    return (tilegrid_extent.X, tilegrid_extent.Y, image_receptacle)
 end
 
 # We also use this in some Makie converts to allow `image` to work
