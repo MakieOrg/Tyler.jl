@@ -41,7 +41,7 @@ function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Re
     tilegrid = MapTiles.TileGrid(bbox, optimal_z_index, MapTiles.WGS84())
     # Compute the dimensions of the tile grid, so we can feed them into a 
     # Raster later.
-    tilegrid_extent = Extents.extent(tilegrid, MapTiles.WGS84())
+    tilegrid_extent = Extents.extent(tilegrid, MapTiles.WebMercator())
     #= TODO:
     Here we assume all tiles are 256x256.  
     It's easy to compute this though, by either:
