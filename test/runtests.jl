@@ -39,10 +39,10 @@ m = wait(Tyler.Map(london; scale=1)) # waits until all tiles are displayed
 end
 
 @testset "Basemap" begin
-    @test_nowarn basemap(TileProviders.Google(), london, (1000, 1000))
-    @test_nowarn basemap(TileProviders.Google(), london; size = (1000, 1000))
-    @test_nowarn basemap(TileProviders.Google(), london; res = 0.001)
-    x, y, img = basemap(TileProviders.Google(), london, (1000, 1000))
+    @test_nowarn basemap(Tyler.TileProviders.Google(), london, (1000, 1000))
+    @test_nowarn basemap(Tyler.TileProviders.Google(), london; size = (1000, 1000))
+    @test_nowarn basemap(Tyler.TileProviders.Google(), london; res = 0.001)
+    x, y, img = basemap(Tyler.TileProviders.Google(), london, (1000, 1000))
     @test img isa Matrix{<: RGBA}
 end
 
