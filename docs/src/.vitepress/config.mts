@@ -45,6 +45,7 @@ export default defineConfig({
         { text: 'Whale shark trajectory', link: '/whale_shark' },
         { text: 'Ice loss animation', link: '/iceloss_ex' },
         { text: 'Interpolation On The Fly', link: '/interpolation' },
+        { text: 'Base maps', link: '/basemap' },
       ]
      },
 
