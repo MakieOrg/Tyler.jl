@@ -169,7 +169,7 @@ function Map(extent, extent_crs=wgs84;
         max_parallel_downloads, OrderedSet{Tile}(),
         tiles_being_added, downloaded_tiles,
         display_task, download_task,
-        depth, halo, scale, max_zoom
+        depth, Float64(halo), Float64(scale), max_zoom
     )
     tyler.zoom[] = get_zoom(tyler, extent)
     download_task[] = @async begin
@@ -302,8 +302,8 @@ end
 function fetch_tile(provider::AbstractProvider, tile::Tile)
     url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
     result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
-    io = IOBuffer(result.body)
-    format = FileIO.query(io) # this interrogates the magic bits to see what to do
+    io = IOBuffer(result.body) # this wraps the byte data in an IO-like type
+    format = FileIO.query(io)  # this interrogates the magic bits to see what file format it is (JPEG, PNG, etc)
     return FileIO.load(format) # this actually loads the data using ImageIO.jl or whatever other FileIO loader exists
 end
 
