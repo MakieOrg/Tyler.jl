@@ -62,7 +62,7 @@ function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Re
         url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
         result = HTTP.get(url)
         # Read into an in-memory array (Images.jl layout)
-        img = ImageMagick.readblob(result.body)
+        img = FileIO.load(FileIO.query(IOBuffer(result)))
         # The thing with the y indices is that they go in the reverse of the natural order.
         # So, we simply subtract the y index from the end index to get the correct placement.
         image_start_relative = (
