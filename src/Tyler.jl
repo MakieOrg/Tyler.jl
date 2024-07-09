@@ -5,10 +5,10 @@ using Extents: Extents, Extent
 using GeoInterface: GeoInterface
 using GeometryBasics: GeometryBasics, GLTriangleFace, Point2f, Vec2f, Rect2f, Rect2, Rect, decompose, decompose_uv
 using HTTP: HTTP
-using ImageMagick: ImageMagick
 using LRUCache: LRUCache, LRU
 using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
-using Makie: Makie, Observable, Figure, Axis, RGBAf, on, isopen, meta, mesh!, translate!, scale!
+using Makie: Makie, Observable, Figure, Axis, RGBAf, on, isopen, linesegments!, meta, mesh!, translate!, scale!
+using Makie: FileIO, ImageIO
 using OrderedCollections: OrderedCollections, OrderedSet
 using ThreadSafeDicts: ThreadSafeDicts, ThreadSafeDict
 using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
@@ -46,15 +46,15 @@ downloading and plotting more tiles as you zoom and pan.
 -`scale`: a tile scaling factor. Low number decrease the downloads but reduce the resolution.
     The default is `1.0`.
 """
-struct Map
+struct Map{A<:Makie.AbstractAxis}
     provider::AbstractProvider
     crs::CoordinateReferenceSystemFormat
     zoom::Observable{Int}
     figure::Figure
-    axis::Axis
+    axis::A
     displayed_tiles::OrderedSet{Tile}
     plots::Dict{Tile,Any}
-    free_tiles::Vector{Makie.Combined}
+    free_tiles::Vector{Makie.Plot}
     fetched_tiles::LRU{Tile,TileImage}
     max_parallel_downloads::Int
     # TODO, use Channel here
@@ -151,9 +151,15 @@ function Map(extent, extent_crs=wgs84;
     ext_target = MapTiles.project_extent(extent, extent_crs, crs)
     X = ext_target.X
     Y = ext_target.Y
-    axis.autolimitaspect = 1
-    Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
-
+    if axis isa Makie.Axis3
+        Makie.xlims!(axis, X[1], X[2])
+        Makie.ylims!(axis, Y[1], Y[2])
+    elseif axis isa Makie.LScene
+        # do nothing
+    else # any other axis is 2d
+        axis.autolimitaspect = 1
+        Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
+    end
     plots = Dict{Tile,Any}()
     tyler = Map(
         provider, crs,
@@ -163,7 +169,7 @@ function Map(extent, extent_crs=wgs84;
         max_parallel_downloads, OrderedSet{Tile}(),
         tiles_being_added, downloaded_tiles,
         display_task, download_task,
-        depth, halo, scale, max_zoom
+        depth, Float64(halo), Float64(scale), max_zoom
     )
     tyler.zoom[] = get_zoom(tyler, extent)
     download_task[] = @async begin
@@ -204,16 +210,21 @@ function Map(extent, extent_crs=wgs84;
     # Queue tiles to be downloaded & displayed
     update_tiles!(tyler, ext_target)
 
-    on(axis.scene, axis.finallimits) do extent
-        stopped_displaying(figure) && return
-        update_tiles!(tyler, extent)
-        return
+    if axis isa Union{Makie.Axis, Makie.Axis3} 
+        on(axis.scene, axis.finallimits) do extent
+            stopped_displaying(figure) && return
+            update_tiles!(tyler, extent)
+            return
+        end
+    else
+        # we can't hook it up so don't do anything.
+        # the user can zoom manually using `update_tiles!`.
     end
     return tyler
 end
 
 GeoInterface.crs(tyler::Map) = tyler.crs
-Extents.extent(tyler::Map) = Extents.extent(tyler.axis.finallimits[])
+Extents.extent(tyler::Map) = Extents.extent(Makie.Rect2d(tyler.axis.finallimits[]))
 
 function stop_download!(map::Map, tile::Tile)
     # delete!(map.tiles_being_added, tile)
@@ -261,7 +272,7 @@ function place_tile!(tile::Tile, plot, crs)
     xmin, xmax = bounds.X
     ymin, ymax = bounds.Y
     translate!(plot, xmin, ymin, tile.z - 100)
-    scale!(plot, xmax - xmin, ymax - ymin, 0)
+    scale!(plot, xmax - xmin, ymax - ymin, 1)
     return
 end
 
@@ -283,6 +294,7 @@ function create_tile_plot!(tyler::Map, tile::Tile, image::TileImage)
 end
 
 function fetch_tile(tyler::Map, tile::Tile)
+    #println("Fetching Tile")
     return get!(tyler.fetched_tiles, tile) do
         fetch_tile(tyler.provider, tile)
     end
@@ -290,7 +302,9 @@ end
 function fetch_tile(provider::AbstractProvider, tile::Tile)
     url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
     result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
-    return ImageMagick.readblob(result.body)
+    io = IOBuffer(result.body) # this wraps the byte data in an IO-like type
+    format = FileIO.query(io)  # this interrogates the magic bits to see what file format it is (JPEG, PNG, etc)
+    return FileIO.load(format) # this actually loads the data using ImageIO.jl or whatever other FileIO loader exists
 end
 
 function queue_tile!(tyler::Map, tile)
@@ -412,13 +426,13 @@ function grow_extent(area::Union{Rect,Extent}, factor)
 end
 
 function debug_tile!(map::Tyler.Map, tile::Tile)
-    plot = linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1)
+    plot = Makie.linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1)
     Tyler.place_tile!(tile, plot, web_mercator)
 end
 
 function debug_tiles!(map::Tyler.Map)
-    for tile in m.displayed_tiles
-        debug_tile!(m, tile)
+    for tile in map.displayed_tiles
+        debug_tile!(map, tile)
     end
 end
 
