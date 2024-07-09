@@ -5,10 +5,10 @@ using Extents: Extents, Extent
 using GeoInterface: GeoInterface
 using GeometryBasics: GeometryBasics, GLTriangleFace, Point2f, Vec2f, Rect2f, Rect2, Rect, decompose, decompose_uv
 using HTTP: HTTP
-using ImageMagick: ImageMagick
 using LRUCache: LRUCache, LRU
 using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
 using Makie: Makie, Observable, Figure, Axis, RGBAf, on, isopen, linesegments!, meta, mesh!, translate!, scale!
+using Makie: FileIO, ImageIO
 using OrderedCollections: OrderedCollections, OrderedSet
 using ThreadSafeDicts: ThreadSafeDicts, ThreadSafeDict
 using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
@@ -302,7 +302,9 @@ end
 function fetch_tile(provider::AbstractProvider, tile::Tile)
     url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
     result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
-    return ImageMagick.readblob(result.body)
+    io = IOBuffer(result.body)
+    format = FileIO.query(io) # this interrogates the magic bits to see what to do
+    return FileIO.load(format) # this actually loads the data using ImageIO.jl or whatever other FileIO loader exists
 end
 
 function queue_tile!(tyler::Map, tile)
