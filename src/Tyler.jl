@@ -426,7 +426,7 @@ function grow_extent(area::Union{Rect,Extent}, factor)
 end
 
 function debug_tile!(map::Tyler.Map, tile::Tile)
-    plot = Makie.linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1)
+    plot = Makie.linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1, xautolimits = false, yautolimits = false, zautolimits = false, inspectable = false,)
     Tyler.place_tile!(tile, plot, web_mercator)
 end
 
