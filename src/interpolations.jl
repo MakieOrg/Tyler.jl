@@ -14,6 +14,7 @@ struct Interpolator{F} <: AbstractProvider
     colormap::Vector{RGBAf}
     options::Dict
 end
+
 Interpolator(f; colormap=:thermal, options=Dict(:minzoom=>1, :maxzoom=>19)) =
     Interpolator(f, Makie.to_colormap(colormap), options)
 
@@ -23,7 +24,7 @@ function fetch_tile(interpolator::Interpolator, tile::Tile)
     return [_col(interpolator, i) for i in z]
 end
 
-# TODO just use Makie plotting for colors, 
+# TODO just use Makie plotting for colors,
 # we just need to pass the args throught to it
 _col(i::Interpolator, x) = RGBAf(Makie.interpolated_getindex(i.colormap, x))
 _col(::Interpolator, x::RGBAf) = x
@@ -35,7 +36,8 @@ _tile2lng(x, z) = (x / 2^z * 360) - 180
 _tile2lat(y, z) = -180 / pi * atan(0.5 * (exp(pi - 2 * pi * y / 2^z) - exp(2 * pi * y / 2^z - pi)))
 
 _tile2positions(tile::Tile) = _tile2positions(tile.x, tile.y, tile.z)
-function _tile2positions(x, y, z) 
+
+function _tile2positions(x, y, z)
     rng = range(0.5 / 232, 231.5 / 232,232)
     lons = [_tile2lng(x + i, z) for i in rng, j in rng]
     lats = [_tile2lat(y + j, z) for i in rng, j in rng]
