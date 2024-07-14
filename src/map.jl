@@ -1,3 +1,6 @@
+import Makie: Point3d
+
+
 abstract type AbstractMap end
 
 Base.showable(::MIME"image/png", ::AbstractMap) = true
@@ -31,7 +34,7 @@ function stopped_displaying(fig::Figure)
 end
 
 function debug_tile!(map::AbstractMap, tile::Tile)
-    plot = linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1)
+    plot = Makie.linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1, overdraw = true)
     Tyler.place_tile!(tile, plot, web_mercator)
 end
 
@@ -52,8 +55,8 @@ function create_tileplot!(axis, image)
     faces = decompose(GLTriangleFace, rect)
     uv = decompose_uv(rect)
     map!(uv -> Vec2f(uv[1], 1 - uv[2]), uv, uv)
-    m = GeometryBasics.Mesh(meta(points; uv=uv), faces)
-    # Plot directly into scene to not update limits
+    m = GeometryBasics.Mesh(meta(Makie.to_ndim.((Point3d,), points, (0,)); uv=uv), faces)
+    # Plot directly into scene to not update limits 
     return mesh!(axis.scene, m; color=image, shading=Makie.NoShading, inspectable=false)
 end
 
@@ -63,7 +66,7 @@ function place_tile!(tile::Tile, plot::Plot, crs)
     xmin, xmax = bounds.X
     ymin, ymax = bounds.Y
     Makie.translate!(plot, xmin, ymin, tile.z - 100)
-    Makie.scale!(plot, xmax - xmin, ymax - ymin, 0)
+    Makie.scale!(plot, xmax - xmin, ymax - ymin, 1)
     return
 end
 
