@@ -24,7 +24,7 @@ end
 function fetch_tile(provider::AbstractProvider, tile::Tile)
     url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
     result = HTTP.get(url; retry=false, readtimeout=4, connect_timeout=4)
-    return ImageMagick.readblob(result.body)
+    return FileIO.load(FileIO.query(IOBuffer(result.body)))
 end
 
 
