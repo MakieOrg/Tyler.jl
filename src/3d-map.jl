@@ -51,7 +51,7 @@ using Makie: Vec3f
 function Map3D(extent, extent_crs=wgs84;
         resolution=(1000, 1000),
         figure=Makie.Figure(; size=resolution),
-        axis=Makie.LScene(figure[1, 1]),
+        axis=Makie.LScene(figure[1, 1]; show_axis=false),
         provider=TileProviders.OpenStreetMap(:Mapnik),
         crs=MapTiles.web_mercator,
         cache_size_gb=5,
@@ -60,25 +60,20 @@ function Map3D(extent, extent_crs=wgs84;
         scale=2.0,
         max_zoom=TileProviders.max_zoom(provider)
     )
-    println("hi")
-
     # Extent
     # if extent input is a HyperRectangle then convert to type Extent
     extent isa Extent || (extent = Extents.extent(extent))
     ext_target = MapTiles.project_extent(extent, extent_crs, crs)
     X = ext_target.X
     Y = ext_target.Y
-    # axis.scene.theme.limits[] = Makie.Rect3f(Vec3f(X[1], Y[1], 0), Vec3f(X[2], Y[2], 10))
 
-    tiles = TileCache{TileImage}(provider; cache_size_gb=cache_size_gb)
-    println("CACHE")
+    tiles = TileCache{Any}(provider; cache_size_gb=cache_size_gb)
     downloaded_tiles = tiles.downloaded_tiles
 
     plots = Dict{Tile,Any}()
     displayed_tiles = OrderedSet{Tile}()
     free_tiles = Makie.Plot[]
     display_task = Base.RefValue{Task}()
-    println("MAP")
     map = Map3D(
         provider, figure,
         axis,
@@ -118,22 +113,6 @@ function Map3D(extent, extent_crs=wgs84;
     return map
 end
 
-function create_tile_plot!(map::Map3D, tile::Tile, image::TileImage)
-    if haskey(map.plots, tile)
-        # this shouldn't get called with plots that are already displayed
-        @debug "getting tile plot already plotted"
-        return map.plots[tile]
-    end
-    if isempty(map.free_tiles)
-        mplot = create_tileplot!(map.axis, image)
-    else
-        mplot = pop!(map.free_tiles)
-        mplot.color[] = image
-        mplot.visible = true
-    end
-    map.plots[tile] = mplot
-    place_tile!(tile, mplot, map.crs)
-end
 
 
 
@@ -157,23 +136,14 @@ function update_tiles!(m::Map3D, area::Union{Rect,Extent})
     depth = m.depth
 
     # Calculate the zoom level
-    zoom = get_zoom(m, area)
+    zoom = 11#get_zoom(m, area) ÷ 2
+    @show zoom
     m.zoom[] = zoom
 
     # And the z layers we will plot
     layer_range = max(min_zoom(m), zoom - depth):zoom
-    # Get the tiles around the mouse first
-    # Make a halo around the mouse tile to load next, intersecting area so we don't download outside the plot
-    # Define a halo around the area to download last, so pan/zoom are filled already
-    halo_area = grow_extent(area, m.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
-    # Define all the tiles in the order they will load in
-    areas = [area, halo_area]
-
-    area_layers = Iterators.flatten(map(layer_range) do z
-        return Iterators.flatten(map(areas) do ext
-            return MapTiles.TileGrid(ext, z, m.crs)
-        end)
-    end)
+#
+    area_layers = vec(collect(MapTiles.TileGrid(area, zoom, m.crs)))
 
     # Create the full set of tiles
     # Using an ordered set gives a smoother load than a Set
@@ -182,7 +152,7 @@ function update_tiles!(m::Map3D, area::Union{Rect,Extent})
     remove_tiles!(m, new_tiles_set)
 
     to_add = setdiff(new_tiles_set, m.displayed_tiles)
-
+    @show length(to_add)
     # replace
     empty!(m.displayed_tiles)
     union!(m.displayed_tiles, new_tiles_set)

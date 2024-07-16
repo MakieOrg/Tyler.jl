@@ -12,7 +12,11 @@ function TileCache{TileFormat}(provider; cache_size_gb=5) where {TileFormat}
     tile_queue = Channel{Tile}(Inf; spawn=true) do tile_queue
         for tile in tile_queue
             downloaded_tile = get!(fetched_tiles, tile) do
-                fetch_tile(provider, tile)
+                try
+                    fetch_tile(provider, tile)
+                catch e
+                    @warn "Error while fetching tile" exception = (e, catch_backtrace())
+                end
             end
             # we may have moved already and the tile doesn't need to be displayed anymore
             put!(downloaded_tiles, (tile, downloaded_tile))

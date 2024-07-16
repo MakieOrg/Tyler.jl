@@ -46,7 +46,12 @@ struct Map <: AbstractMap
     max_zoom::Int
 end
 
-function create_tile_plot!(map::Map, tile::Tile, image::TileImage)
+function update_tile_plot!(plot::Plot, new_data)
+    plot.color[] = new_data
+    plot.visible = true
+end
+
+function create_tile_plot!(map::AbstractMap, tile::Tile, image)
     if haskey(map.plots, tile)
         # this shouldn't get called with plots that are already displayed
         @debug "getting tile plot already plotted"
@@ -56,15 +61,14 @@ function create_tile_plot!(map::Map, tile::Tile, image::TileImage)
         mplot = create_tileplot!(map.axis, image)
     else
         mplot = pop!(map.free_tiles)
-        mplot.color[] = image
-        mplot.visible = true
+        update_tile_plot!(mplot, image)
     end
     map.plots[tile] = mplot
     place_tile!(tile, mplot, map.crs)
 end
 
 # Wait for all tiles to be loaded
-function Base.wait(map::Map)
+function Base.wait(map::AbstractMap)
     # The download + plot loops need a screen to do their work!
     if isnothing(Makie.getscreen(map.figure.scene))
         display(map.figure)
@@ -152,8 +156,6 @@ function Map(extent, extent_crs=wgs84;
     end
     return map
 end
-
-
 
 function update_tiles!(m::Map, area::Union{Rect,Extent})
     area = typeof(area) <: Rect ? Extents.extent(area) : area

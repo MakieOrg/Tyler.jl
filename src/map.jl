@@ -31,7 +31,7 @@ function stopped_displaying(fig::Figure)
 end
 
 function debug_tile!(map::AbstractMap, tile::Tile)
-    plot = linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1)
+    plot = Makie.linesegments!(map.axis, Rect2f(0, 0, 1, 1), color=:red, linewidth=1)
     Tyler.place_tile!(tile, plot, web_mercator)
 end
 
@@ -40,7 +40,13 @@ function debug_tiles!(map::AbstractMap)
         debug_tile!(map, tile)
     end
 end
+using Colors
 
+function create_tileplot!(axis::LScene, image::Tuple)
+    # Plot directly into scene to not update limits
+    matr = image[1] .* -100
+    return Makie.surface!(axis.scene, (0.0, 1.0), (0.0, 1.0), matr; color=image[2], shading=Makie.NoShading, colormap=:terrain, inspectable=false)
+end
 
 function create_tileplot!(axis, image)
     # Use a mesh plot until image rotr90 is fixed
@@ -57,13 +63,23 @@ function create_tileplot!(axis, image)
     return mesh!(axis.scene, m; color=image, shading=Makie.NoShading, inspectable=false)
 end
 
+function place_tile!(tile::Tile, plot::Makie.LineSegments, crs)
+    bounds = MapTiles.extent(tile, crs)
+    xmin, xmax = bounds.X
+    ymin, ymax = bounds.Y
+    plot[1] = Rect2f(xmin, ymin, xmax-xmin, ymax-ymin)
+    Makie.translate!(plot, 0, 0, tile.z * 10)
+    return
+end
+
 
 function place_tile!(tile::Tile, plot::Plot, crs)
     bounds = MapTiles.extent(tile, crs)
     xmin, xmax = bounds.X
     ymin, ymax = bounds.Y
-    Makie.translate!(plot, xmin, ymin, tile.z - 100)
-    Makie.scale!(plot, xmax - xmin, ymax - ymin, 0)
+    plot[1] = (xmin, xmax)
+    plot[2] = (ymin, ymax)
+    Makie.translate!(plot, 0, 0, tile.z * 10)
     return
 end
 
