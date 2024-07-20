@@ -27,10 +27,10 @@ downloading and plotting more tiles as you zoom and pan.
 -`scale`: a tile scaling factor. Low number decrease the downloads but reduce the resolution.
     The default is `1.0`.
 """
-struct Map <: AbstractMap
+struct Map{Ax<:AbstractAxis} <: AbstractMap
     provider::AbstractProvider
     figure::Figure
-    axis::Axis
+    axis::Ax
 
     tiles::TileCache
     displayed_tiles::OrderedSet{Tile}
@@ -46,8 +46,20 @@ struct Map <: AbstractMap
     max_zoom::Int
 end
 
+abstract type FetchingScheme end
+
+struct Halo2DTiling
+    depth::Int
+    halo::Float64
+    scale::Float64
+end
+
 function update_tile_plot!(plot::Plot, new_data)
     plot.color[] = new_data
+    plot.visible = true
+end
+function update_tile_plot!(plot::Plot, new_data::AbstractMatrix)
+    plot.color[] = rotr90(new_data)
     plot.visible = true
 end
 
@@ -100,7 +112,7 @@ function Map(extent, extent_crs=wgs84;
     axis.autolimitaspect = 1
     Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
 
-    tiles = TileCache{TileImage}(provider; cache_size_gb=cache_size_gb)
+    tiles = TileCache(provider; cache_size_gb=cache_size_gb)
     downloaded_tiles = tiles.downloaded_tiles
 
     plots = Dict{Tile,Any}()
@@ -124,7 +136,7 @@ function Map(extent, extent_crs=wgs84;
         depth, halo, scale, max_zoom
     )
 
-    map.zoom[] = get_zoom(map, extent)
+    map.zoom[] = calculate_optimal_zoom(map, extent)
 
 
     display_task[] = @async for (tile, img) in downloaded_tiles
@@ -148,23 +160,38 @@ function Map(extent, extent_crs=wgs84;
 
     # Queue tiles to be downloaded & displayed
     update_tiles!(map, ext_target)
+    tile_reloader(map)
+    return map
+end
 
+
+function tile_reloader(map::Map{Axis})
+    axis = map.axis
+    figure = map.figure
     on(axis.scene, axis.finallimits) do extent
         stopped_displaying(figure) && return
         update_tiles!(map, extent)
         return
     end
-    return map
 end
 
-function update_tiles!(m::Map, area::Union{Rect,Extent})
+function get_tiles(m, tiling_scheme, area, crs)
+    # This needs to know which zoom level to use to get tiles that have enough pixel to fill the screen
+    # The tiling scheme decides if there will be e.g. a halo around the area
+    # Or other considerations
+    zoom = calculate_optimal_zoom(resolution(m), tiling_scheme, area)
+    tiles = tiles_for_area(tiling_scheme, area, zoom, crs)
+end
+
+
+function update_tiles!(m::Map{Axis}, area::Union{Rect,Extent})
     area = typeof(area) <: Rect ? Extents.extent(area) : area
     # `depth` determines the number of layers below the current
     # layer to load. Tiles are downloaded in order from lowest to highest zoom.
     depth = m.depth
 
     # Calculate the zoom level
-    zoom = get_zoom(m, area)
+    zoom = calculate_optimal_zoom(m, area)
     m.zoom[] = zoom
 
     # And the z layers we will plot
@@ -218,7 +245,7 @@ Extents.extent(map::Map) = Extents.extent(map.axis.finallimits[])
 TileProviders.max_zoom(map::Map) = map.max_zoom
 TileProviders.min_zoom(map::Map) = Int(min_zoom(map.provider))
 
-function get_zoom(map::Map, area)
+function calculate_optimal_zoom(map::Map, area)
     res = size(map.axis.scene) .* map.scale
     return clamp(z_index(area, (X=res[2], Y=res[1]), map.crs), min_zoom(map), max_zoom(map))
 end

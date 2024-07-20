@@ -53,7 +53,7 @@ function Map3D(extent, extent_crs=wgs84;
         figure=Makie.Figure(; size=resolution),
         axis=Makie.LScene(figure[1, 1]; show_axis=false),
         provider=TileProviders.OpenStreetMap(:Mapnik),
-        crs=MapTiles.web_mercator,
+        crs=web_mercator,
         cache_size_gb=5,
         depth=8,
         halo=0.2,
@@ -86,7 +86,7 @@ function Map3D(extent, extent_crs=wgs84;
         depth, halo, scale, max_zoom
     )
 
-    map.zoom[] = get_zoom(map, extent)
+    map.zoom[] = calculate_optimal_zoom(map, extent)
 
     display_task[] = @async for (tile, img) in downloaded_tiles
         while isnothing(Makie.getscreen(map.axis.scene))
@@ -114,20 +114,16 @@ function Map3D(extent, extent_crs=wgs84;
 end
 
 
-
-
 GeoInterface.crs(map::Map3D) = map.crs
 Extents.extent(map::Map3D) = Extents.extent(map.axis.scene.theme.limits[])
 
 TileProviders.max_zoom(map::Map3D) = map.max_zoom
 TileProviders.min_zoom(map::Map3D) = Int(min_zoom(map.provider))
 
-function get_zoom(map::Map3D, area)
+function calculate_optimal_zoom(map::Map3D, area)
     res = size(map.axis.scene) .* map.scale
     return clamp(z_index(area, (X=res[2], Y=res[1]), map.crs), min_zoom(map), max_zoom(map))
 end
-
-
 
 function update_tiles!(m::Map3D, area::Union{Rect,Extent})
     area = typeof(area) <: Rect ? Extents.extent(area) : area
@@ -136,7 +132,7 @@ function update_tiles!(m::Map3D, area::Union{Rect,Extent})
     depth = m.depth
 
     # Calculate the zoom level
-    zoom = 11#get_zoom(m, area) ÷ 2
+    zoom = 12
     @show zoom
     m.zoom[] = zoom
 

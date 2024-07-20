@@ -13,8 +13,6 @@ using OrderedCollections: OrderedCollections, OrderedSet
 using ThreadSafeDicts: ThreadSafeDicts, ThreadSafeDict
 using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
 
-const TileImage = Matrix{RGB{N0f8}}
-
 include("interpolations.jl")
 include("tiles.jl")
 include("map.jl")

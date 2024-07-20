@@ -49,18 +49,8 @@ function create_tileplot!(axis::LScene, image::Tuple)
 end
 
 function create_tileplot!(axis, image)
-    # Use a mesh plot until image rotr90 is fixed
-    # Also, this will make it easier to subdivide the image mesh
-    # To apply some other coordinate transforms
-    # use GeometryBasics.Tesselation(rect, (128, 128)) to get a 128x128 subdivied mesh
-    rect = Rect2f(0, 0, 1, 1)
-    points = decompose(Point2f, rect)
-    faces = decompose(GLTriangleFace, rect)
-    uv = decompose_uv(rect)
-    map!(uv -> Vec2f(uv[1], 1 - uv[2]), uv, uv)
-    m = GeometryBasics.Mesh(meta(points; uv=uv), faces)
     # Plot directly into scene to not update limits
-    return mesh!(axis.scene, m; color=image, shading=Makie.NoShading, inspectable=false)
+    return Makie.image!(axis.scene, (0.0, 1.0), (0.0, 1.0), rotr90(image); inspectable=false)
 end
 
 function place_tile!(tile::Tile, plot::Makie.LineSegments, crs)
