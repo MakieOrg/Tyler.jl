@@ -1,3 +1,11 @@
+abstract type FetchingScheme end
+
+struct Halo2DTiling <: FetchingScheme
+    depth::Int
+    halo::Float64
+    pixel_scale::Float64
+end
+
 """
     Map
 
@@ -27,7 +35,7 @@ downloading and plotting more tiles as you zoom and pan.
 -`scale`: a tile scaling factor. Low number decrease the downloads but reduce the resolution.
     The default is `1.0`.
 """
-struct Map{Ax<:AbstractAxis} <: AbstractMap
+struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     provider::AbstractProvider
     figure::Figure
     axis::Ax
@@ -40,54 +48,35 @@ struct Map{Ax<:AbstractAxis} <: AbstractMap
 
     crs::CoordinateReferenceSystemFormat
     zoom::Observable{Int}
-    depth::Int
-    halo::Float64
-    scale::Float64
+    fetching_scheme::FetchingScheme
     max_zoom::Int
 end
 
-abstract type FetchingScheme end
+setup_axis!(axis::Makie.AbstractAxis, ext_target) = nothing
 
-struct Halo2DTiling
-    depth::Int
-    halo::Float64
-    scale::Float64
+function setup_axis!(axis::Axis, ext_target)
+    X = ext_target.X
+    Y = ext_target.Y
+    axis.autolimitaspect = 1
+    Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
+    return
+end
+using Makie
+
+
+function scale_extent(f, extent)
+    (xmin_xmax, ymin_ymax) = map(f, extent)
+    return Extent(; X=xmin_xmax, Y=ymin_ymax)
 end
 
-function update_tile_plot!(plot::Plot, new_data)
-    plot.color[] = new_data
-    plot.visible = true
-end
-function update_tile_plot!(plot::Plot, new_data::AbstractMatrix)
-    plot.color[] = rotr90(new_data)
-    plot.visible = true
+
+function scaled_extent(axis, extent, extent_crs, crs)
+    return MapTiles.project_extent(extent, extent_crs, crs)
 end
 
-function create_tile_plot!(map::AbstractMap, tile::Tile, image)
-    if haskey(map.plots, tile)
-        # this shouldn't get called with plots that are already displayed
-        @debug "getting tile plot already plotted"
-        return map.plots[tile]
-    end
-    if isempty(map.free_tiles)
-        mplot = create_tileplot!(map.axis, image)
-    else
-        mplot = pop!(map.free_tiles)
-        update_tile_plot!(mplot, image)
-    end
-    map.plots[tile] = mplot
-    place_tile!(tile, mplot, map.crs)
-end
-
-# Wait for all tiles to be loaded
-function Base.wait(map::AbstractMap)
-    # The download + plot loops need a screen to do their work!
-    if isnothing(Makie.getscreen(map.figure.scene))
-        display(map.figure)
-    end
-    screen = Makie.getscreen(map.figure.scene)
-    isnothing(screen) && error("No screen after display. Wrong backend? Only WGLMakie and GLMakie are supported.")
-    wait(map.tiles)
+function scaled_extent(tile, crs)
+    extent = MapTiles.extent(tile, crs)
+    return extent
 end
 
 function Map(extent, extent_crs=wgs84;
@@ -97,25 +86,20 @@ function Map(extent, extent_crs=wgs84;
         provider=TileProviders.OpenStreetMap(:Mapnik),
         crs=MapTiles.web_mercator,
         cache_size_gb=5,
-        depth=8,
-        halo=0.2,
-        scale=2.0,
+        fetching_scheme = Halo2DTiling(8, 0.2, 2),
         max_zoom=TileProviders.max_zoom(provider)
     )
 
     # Extent
     # if extent input is a HyperRectangle then convert to type Extent
     extent isa Extent || (extent = Extents.extent(extent))
-    ext_target = MapTiles.project_extent(extent, extent_crs, crs)
-    X = ext_target.X
-    Y = ext_target.Y
-    axis.autolimitaspect = 1
-    Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
+    ext_target = scaled_extent(axis, extent, extent_crs, crs)
+    setup_axis!(axis, ext_target)
 
     tiles = TileCache(provider; cache_size_gb=cache_size_gb)
     downloaded_tiles = tiles.downloaded_tiles
 
-    plots = Dict{Tile,Any}()
+    plots = Dict{Tile,Plot}()
     displayed_tiles = OrderedSet{Tile}()
     free_tiles = Makie.Plot[]
     display_task = Base.RefValue{Task}()
@@ -133,7 +117,7 @@ function Map(extent, extent_crs=wgs84;
 
         crs,
         Observable(1),
-        depth, halo, scale, max_zoom
+        fetching_scheme, max_zoom
     )
 
     map.zoom[] = calculate_optimal_zoom(map, extent)
@@ -158,16 +142,26 @@ function Map(extent, extent_crs=wgs84;
         end
     end
 
-    # Queue tiles to be downloaded & displayed
-    update_tiles!(map, ext_target)
-    tile_reloader(map)
+    tile_reloader(map, ext_target)
     return map
 end
 
+# Wait for all tiles to be loaded
+function Base.wait(map::AbstractMap)
+    # The download + plot loops need a screen to do their work!
+    if isnothing(Makie.getscreen(map.figure.scene))
+        display(map.figure)
+    end
+    screen = Makie.getscreen(map.figure.scene)
+    isnothing(screen) &&
+        error("No screen after display. Wrong backend? Only WGLMakie and GLMakie are supported.")
+    return wait(map.tiles)
+end
 
-function tile_reloader(map::Map{Axis})
+function tile_reloader(map::Map{Axis}, first_area)
     axis = map.axis
     figure = map.figure
+    update_tiles!(map, first_area)
     on(axis.scene, axis.finallimits) do extent
         stopped_displaying(figure) && return
         update_tiles!(map, extent)
@@ -175,20 +169,12 @@ function tile_reloader(map::Map{Axis})
     end
 end
 
-function get_tiles(m, tiling_scheme, area, crs)
-    # This needs to know which zoom level to use to get tiles that have enough pixel to fill the screen
-    # The tiling scheme decides if there will be e.g. a halo around the area
-    # Or other considerations
-    zoom = calculate_optimal_zoom(resolution(m), tiling_scheme, area)
-    tiles = tiles_for_area(tiling_scheme, area, zoom, crs)
-end
 
-
-function update_tiles!(m::Map{Axis}, area::Union{Rect,Extent})
+function get_tiles_for_area(m::Map{Axis}, scheme::Halo2DTiling, area::Union{Rect,Extent})
     area = typeof(area) <: Rect ? Extents.extent(area) : area
     # `depth` determines the number of layers below the current
     # layer to load. Tiles are downloaded in order from lowest to highest zoom.
-    depth = m.depth
+    depth = scheme.depth
 
     # Calculate the zoom level
     zoom = calculate_optimal_zoom(m, area)
@@ -200,11 +186,11 @@ function update_tiles!(m::Map{Axis}, area::Union{Rect,Extent})
     xpos, ypos = Makie.mouseposition(m.axis.scene)
     xspan = (area.X[2] - area.X[1]) * 0.01
     yspan = (area.Y[2] - area.Y[1]) * 0.01
-    mouse_area = Extents.Extent(X=(xpos - xspan, xpos + xspan), Y=(ypos - yspan, ypos + yspan))
+    mouse_area = Extents.Extent(; X=(xpos - xspan, xpos + xspan), Y=(ypos - yspan, ypos + yspan))
     # Make a halo around the mouse tile to load next, intersecting area so we don't download outside the plot
     mouse_halo_area = grow_extent(mouse_area, 10)
     # Define a halo around the area to download last, so pan/zoom are filled already
-    halo_area = grow_extent(area, m.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
+    halo_area = grow_extent(area, scheme.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
     # Define all the tiles in the order they will load in
     areas = if Extents.intersects(mouse_halo_area, area)
         mha = Extents.intersection(mouse_halo_area, area)
@@ -217,15 +203,20 @@ function update_tiles!(m::Map{Axis}, area::Union{Rect,Extent})
         [area, halo_area]
     end
 
-    area_layers = Iterators.flatten(map(layer_range) do z
-        return Iterators.flatten(map(areas) do ext
-            return MapTiles.TileGrid(ext, z, m.crs)
-        end)
-    end)
+    area_layers = OrderedSet{Tile}()
 
-    # Create the full set of tiles
+    for z in layer_range
+        for ext in areas
+            union!(area_layers, MapTiles.TileGrid(ext, z, m.crs))
+        end
+    end
+    return area_layers
+end
+
+
+function update_tiles!(m::Map, arealike)
     # Using an ordered set gives a smoother load than a Set
-    new_tiles_set = OrderedSet{Tile}(area_layers)
+    new_tiles_set = get_tiles_for_area(m, m.fetching_scheme, arealike)
     # Remove any tiles not in the new set
     remove_tiles!(m, new_tiles_set)
 
@@ -246,6 +237,7 @@ TileProviders.max_zoom(map::Map) = map.max_zoom
 TileProviders.min_zoom(map::Map) = Int(min_zoom(map.provider))
 
 function calculate_optimal_zoom(map::Map, area)
-    res = size(map.axis.scene) .* map.scale
-    return clamp(z_index(area, (X=res[2], Y=res[1]), map.crs), min_zoom(map), max_zoom(map))
+    screen = Makie.getscreen(map.axis.scene)
+    res = isnothing(screen) ? size(map.axis.scene) : size(screen.framebuffer)
+    return clamp(z_index(area, res, map.crs), min_zoom(map), max_zoom(map))
 end

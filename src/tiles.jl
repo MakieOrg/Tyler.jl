@@ -7,7 +7,7 @@ end
 
 get_tile_format(provider) = Matrix{RGB{N0f8}}
 
-function TileCache(provider; cache_size_gb=5) where {TileFormat}
+function TileCache(provider; cache_size_gb=5)
     TileFormat = get_tile_format(provider)
     fetched_tiles = LRU{Tile,TileFormat}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
     downloaded_tiles = Channel{Tuple{Tile,TileFormat}}(Inf)

@@ -18,8 +18,9 @@ include("tiles.jl")
 include("map.jl")
 include("2d-map.jl")
 include("3d-map.jl")
+include("tile-plotting.jl")
 
-function z_index(extent::Union{Rect,Extent}, res::NamedTuple, crs)
+function z_index(extent::Union{Rect,Extent}, res::Tuple, crs)
     # Calculate the number of tiles at each z and get the one
     # closest to the resolution `res`
     target_ntiles = prod(map(r -> r / 256, res))
