@@ -4,7 +4,7 @@ function move_in_front!(plot, bounds::Rect2)
     if !hasproperty(plot, :depth_shift)
         translate!(plot, 0, 0, 0)
     else
-        plot.depth_shift = -0.1f0
+        plot.depth_shift = 0f0
     end
 end
 
@@ -78,6 +78,23 @@ function create_tile_plot!(map::AbstractMap, tile::Tile, data)
             end
         end
     end
+    # Cull unused plots
+    if length(map.plots) > 200
+        # remove the oldest plot
+        plotted_tiles = getindex.(values(map.plots), 2)
+        available_to_remove = setdiff(plotted_tiles, keys(map.current_tiles))
+        sort!(available_to_remove, by=tile-> abs(tile.z - map.zoom[]))
+        n_avail = length(available_to_remove)
+        to_remove = available_to_remove[1:(n_avail - 200)]
+        for tile in to_remove
+            plot_key = remove_unused!(map, tile)
+            if !isnothing(plot_key)
+                plot_key[1].visible = false
+                push!(map.unused_plots, plot_key[1])
+                delete!(map.plots, plot_key[2])
+            end
+        end
+    end
 
     if isempty(map.unused_plots)
         mplot = create_tileplot!(cfg, map.axis, data_processed, bounds, (tile, map.crs))
@@ -87,12 +104,24 @@ function create_tile_plot!(map::AbstractMap, tile::Tile, data)
     end
 
     if bounds isa Rect2
-        move_in_front!(mplot, bounds)
+        if haskey(map.current_tiles, tile)
+            move_in_front!(mplot, bounds)
+        else
+            move_to_back!(mplot, bounds)
+        end
     end
     # Always move new plots to the front
     mplot.visible = true
     cfg.postprocess(mplot)
     map.plots[key] = (mplot, tile, bounds)
+    # TODO, why do get some of the current_tiles stuck on a wrong depth_shift value?
+    for (key, (plot, tile, bounds)) in map.plots
+        if haskey(map.current_tiles, tile)
+            move_in_front!(plot, bounds)
+        else
+            move_to_back!(plot, bounds)
+        end
+    end
     return
 end
 
@@ -162,7 +191,7 @@ function update_tile_plot!(plot::Makie.Image, ::PlotConfig, axis::AbstractAxis, 
     plot[1] = (mini[1], maxi[1])
     plot[2] = (mini[2], maxi[2])
     plot[3] = rotr90(data)
-    return create_bounds(bounds)
+    return
 end
 
 

@@ -6,18 +6,35 @@ function Base.show(io::IO, m::MIME"image/png", map::AbstractMap)
     Makie.show(io, m, map.figure)
 end
 
+
+function remove_unused!(m::Map, tile::Tile)
+    key = TileProviders.geturl(m.provider, tile.x, tile.y, tile.z)
+    return remove_unused!(m, key)
+end
+
+function remove_unused!(m::Map, key::String)
+    plot_tile = get(m.plots, key, nothing)
+    if !isnothing(plot_tile)
+        plot, tile, bounds = plot_tile
+        move_to_back!(plot, bounds)
+        return plot, key
+        if haskey(m.current_tiles, tile)
+            @warn "deleting tile that is still in use"
+        end
+    end
+    return nothing
+end
+
 function update_tileset!(m::AbstractMap, new_current_tiles::OrderedSet{Tile})
     plotted_tiles = getindex.(values(m.plots), 2)
     tile2key = Dict(zip(plotted_tiles, keys(m.plots)))
-    not_needed_anymore = setdiff(plotted_tiles, new_current_tiles)
+    not_needed_anymore = setdiff(keys(m.current_tiles), new_current_tiles)
     for tile in not_needed_anymore
-        key = tile2key[tile]
-        plot_tile = get(m.plots, key, nothing)
-        if !isnothing(plot_tile)
-            plot, tile, bounds = plot_tile
-            move_to_back!(plot, bounds)
+        if haskey(tile2key, tile)
+            key = tile2key[tile]
+            # delete!(m.current_tiles, tile)
+            remove_unused!(m, key)
         end
-        delete!(m.current_tiles, tile)
     end
 
     queue = m.tiles.tile_queue

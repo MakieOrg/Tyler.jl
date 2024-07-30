@@ -42,7 +42,7 @@ struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     plot_config::AbstractPlotConfig
 
     tiles::TileCache
-    current_tiles::OrderedSet{Tile}
+    current_tiles::ThreadSafeDict{Tile, Bool}
     unused_plots::Vector{Makie.Plot}
     plots::ThreadSafeDict{String,Tuple{Makie.Plot,Tile, Rect}}
     display_task::Base.RefValue{Task}
@@ -60,6 +60,12 @@ function setup_axis!(axis::Axis, ext_target)
     Y = ext_target.Y
     axis.autolimitaspect = 1
     Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
+    axis.elements[:background].depth_shift[] = 0.1f0
+    axis.elements[:background].stroke_depth_shift[] = 0.1f0
+    translate!(axis.elements[:background], 0, 0, -1000)
+    axis.elements[:background].color=:transparent
+    axis.xgridvisible = false
+    axis.ygridvisible = false
     return
 end
 
@@ -85,7 +91,7 @@ function Map(extent, extent_crs=wgs84;
     downloaded_tiles = tiles.downloaded_tiles
 
     plots = ThreadSafeDict{String,Tuple{Makie.Plot,Tile,Rect}}()
-    current_tiles = OrderedSet{Tile}()
+    current_tiles = ThreadSafeDict{Tile, Bool}()
     unused_plots = Makie.Plot[]
     display_task = Base.RefValue{Task}()
 
@@ -200,14 +206,15 @@ function update_tiles!(m::Map, arealike)
     # Using an ordered set gives a smoother load than a Set
     new_tiles_set = get_tiles_for_area(m, m.fetching_scheme, arealike)
     # Remove any tiles not in the new set
+    to_add = setdiff(new_tiles_set, keys(m.current_tiles))
     update_tileset!(m, new_tiles_set)
 
-    to_add = setdiff(new_tiles_set, m.current_tiles)
 
     # replace
     empty!(m.current_tiles)
-    union!(m.current_tiles, new_tiles_set)
-
+    for tile in new_tiles_set
+        m.current_tiles[tile] = true
+    end
     # Queue tiles to be downloaded & displayed
     foreach(tile -> put!(m.tiles.tile_queue, tile), to_add)
 end
