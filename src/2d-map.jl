@@ -1,4 +1,4 @@
-abstract type FetchingScheme end
+
 
 struct Halo2DTiling <: FetchingScheme
     depth::Int
@@ -39,11 +39,12 @@ struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     provider::AbstractProvider
     figure::Figure
     axis::Ax
+    plot_config::AbstractPlotConfig
 
     tiles::TileCache
-    displayed_tiles::OrderedSet{Tile}
-    free_tiles::Vector{Makie.Plot}
-    plots::Dict{Tile,Makie.Plot}
+    current_tiles::OrderedSet{Tile}
+    unused_plots::Vector{Makie.Plot}
+    plots::ThreadSafeDict{String,Tuple{Makie.Plot,Tile, Rect}}
     display_task::Base.RefValue{Task}
 
     crs::CoordinateReferenceSystemFormat
@@ -52,7 +53,7 @@ struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     max_zoom::Int
 end
 
-setup_axis!(axis::Makie.AbstractAxis, ext_target) = nothing
+setup_axis!(::Makie.AbstractAxis, ext_target) = nothing
 
 function setup_axis!(axis::Axis, ext_target)
     X = ext_target.X
@@ -61,47 +62,31 @@ function setup_axis!(axis::Axis, ext_target)
     Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
     return
 end
-using Makie
-
-
-function scale_extent(f, extent)
-    (xmin_xmax, ymin_ymax) = map(f, extent)
-    return Extent(; X=xmin_xmax, Y=ymin_ymax)
-end
-
-
-function scaled_extent(axis, extent, extent_crs, crs)
-    return MapTiles.project_extent(extent, extent_crs, crs)
-end
-
-function scaled_extent(tile, crs)
-    extent = MapTiles.extent(tile, crs)
-    return extent
-end
 
 function Map(extent, extent_crs=wgs84;
         resolution=(1000, 1000),
         figure=Makie.Figure(; size=resolution),
         axis=Makie.Axis(figure[1, 1]; aspect=Makie.DataAspect()),
+        plot_config=PlotConfig(),
         provider=TileProviders.OpenStreetMap(:Mapnik),
         crs=MapTiles.web_mercator,
         cache_size_gb=5,
-        fetching_scheme = Halo2DTiling(8, 0.2, 2),
+        fetching_scheme = SimpleTiling(),
         max_zoom=TileProviders.max_zoom(provider)
     )
 
     # Extent
     # if extent input is a HyperRectangle then convert to type Extent
     extent isa Extent || (extent = Extents.extent(extent))
-    ext_target = scaled_extent(axis, extent, extent_crs, crs)
+    ext_target = MapTiles.project_extent(extent, extent_crs, crs)
     setup_axis!(axis, ext_target)
 
     tiles = TileCache(provider; cache_size_gb=cache_size_gb)
     downloaded_tiles = tiles.downloaded_tiles
 
-    plots = Dict{Tile,Plot}()
-    displayed_tiles = OrderedSet{Tile}()
-    free_tiles = Makie.Plot[]
+    plots = ThreadSafeDict{String,Tuple{Makie.Plot,Tile,Rect}}()
+    current_tiles = OrderedSet{Tile}()
+    unused_plots = Makie.Plot[]
     display_task = Base.RefValue{Task}()
 
     map = Map(
@@ -109,9 +94,10 @@ function Map(extent, extent_crs=wgs84;
 
         figure,
         axis,
+        plot_config,
         tiles,
-        displayed_tiles,
-        free_tiles,
+        current_tiles,
+        unused_plots,
         plots,
         display_task,
 
@@ -120,23 +106,11 @@ function Map(extent, extent_crs=wgs84;
         fetching_scheme, max_zoom
     )
 
-    map.zoom[] = calculate_optimal_zoom(map, extent)
-
+    map.zoom[] = 0
 
     display_task[] = @async for (tile, img) in downloaded_tiles
-        while isnothing(Makie.getscreen(map.axis.scene))
-            sleep(0.01)
-        end
-        screen = Makie.getscreen(map.axis.scene)
-        while !isopen(screen)
-            sleep(0.01)
-        end
         try
             create_tile_plot!(map, tile, img)
-            # fixes on demand renderloop which doesn't pick up all updates!
-            if hasproperty(screen, :requires_update)
-                screen.requires_update = true
-            end
         catch e
             @warn "error while creating tile" exception = (e, Base.catch_backtrace())
         end
@@ -160,15 +134,12 @@ end
 
 function tile_reloader(map::Map{Axis}, first_area)
     axis = map.axis
-    figure = map.figure
     update_tiles!(map, first_area)
     on(axis.scene, axis.finallimits) do extent
-        stopped_displaying(figure) && return
         update_tiles!(map, extent)
         return
     end
 end
-
 
 function get_tiles_for_area(m::Map{Axis}, scheme::Halo2DTiling, area::Union{Rect,Extent})
     area = typeof(area) <: Rect ? Extents.extent(area) : area
@@ -213,18 +184,29 @@ function get_tiles_for_area(m::Map{Axis}, scheme::Halo2DTiling, area::Union{Rect
     return area_layers
 end
 
+struct SimpleTiling <: FetchingScheme
+end
+
+function get_tiles_for_area(m::Map, ::SimpleTiling, area::Union{Rect,Extent})
+    area = typeof(area) <: Rect ? Extents.extent(area) : area
+    diag = norm(widths(to_rect(area)))
+    # Calculate the zoom level
+    zoom = optimal_zoom(m, diag)
+    m.zoom[] = zoom
+    return OrderedSet{Tile}(MapTiles.TileGrid(area, zoom, m.crs))
+end
 
 function update_tiles!(m::Map, arealike)
     # Using an ordered set gives a smoother load than a Set
     new_tiles_set = get_tiles_for_area(m, m.fetching_scheme, arealike)
     # Remove any tiles not in the new set
-    remove_tiles!(m, new_tiles_set)
+    update_tileset!(m, new_tiles_set)
 
-    to_add = setdiff(new_tiles_set, m.displayed_tiles)
+    to_add = setdiff(new_tiles_set, m.current_tiles)
 
     # replace
-    empty!(m.displayed_tiles)
-    union!(m.displayed_tiles, new_tiles_set)
+    empty!(m.current_tiles)
+    union!(m.current_tiles, new_tiles_set)
 
     # Queue tiles to be downloaded & displayed
     foreach(tile -> put!(m.tiles.tile_queue, tile), to_add)
@@ -235,6 +217,11 @@ Extents.extent(map::Map) = Extents.extent(map.axis.finallimits[])
 
 TileProviders.max_zoom(map::Map) = map.max_zoom
 TileProviders.min_zoom(map::Map) = Int(min_zoom(map.provider))
+
+function get_resolution(map::Map)
+    screen = Makie.getscreen(map.axis.scene)
+    return isnothing(screen) ? size(map.axis.scene) .* 1.5 : size(screen.framebuffer)
+end
 
 function calculate_optimal_zoom(map::Map, area)
     screen = Makie.getscreen(map.axis.scene)
