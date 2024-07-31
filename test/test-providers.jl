@@ -1,5 +1,6 @@
 using GeometryBasics, GLMakie, Tyler
 using Tyler: ElevationProvider, GeoTilePointCloudProvider
+
 begin
     lat, lon = (52.395593, 4.884704)
     delta = 0.01
@@ -8,6 +9,49 @@ begin
     display(m1.figure.scene)
 end
 
+m1.tiles.tile_queue
+m1.current_tiles
+x = first(m1.plots)[2]
+m1.plots |> length
+
+lines!(m1.axis.scene, x[3])
+boundingbox(x[1])
+for (key, (pl, tile, rect)) in m1.plots
+    if haskey(m1.current_tiles, tile)
+        println("buuh!")
+    else
+        @show pl.depth_shift[]
+        lines!(m1.axis.scene, Rect2f(boundingbox(pl)); color=:black, depth_shift=-0.1f0)
+    end
+end
+using MapTiles, TileProviders
+
+
+new_tiles = Tyler.get_tiles_for_area(m1, m1.fetching_scheme, m1.axis.finallimits[])
+
+for (tile, _) in m1.current_tiles
+    key = TileProviders.geturl(m1.provider, tile.x, tile.y, tile.z)
+    if haskey(m1.plots, key)
+        pl, tile, rect = m1.plots[key]
+        @show pl.depth_shift[]
+        lines!(m1.axis.scene, rect; depth_shift=-0.2f0, color=:red, linewidth=2)
+    else
+        println("lol!")
+    end
+end
+
+for tile in new_tiles
+    rect = Tyler.to_rect(MapTiles.extent(tile, m1.crs))
+    lines!(m1.axis.scene, rect; depth_shift=-0.2f0, color=:red, linewidth=2)
+end
+
+for (key, (pl, tile, rect)) in m1.plots
+    if tile in m1.current_tiles
+        pl.depth_shift[] = 0.0f0
+    else
+        pl.depth_shift[] = 0.1f0
+    end
+end
 
 begin
     # lat, lon = (40.697211, -74.037523)

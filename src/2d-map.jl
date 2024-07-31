@@ -61,9 +61,8 @@ function setup_axis!(axis::Axis, ext_target)
     axis.autolimitaspect = 1
     Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
     axis.elements[:background].depth_shift[] = 0.1f0
-    axis.elements[:background].stroke_depth_shift[] = 0.1f0
     translate!(axis.elements[:background], 0, 0, -1000)
-    axis.elements[:background].color=:transparent
+    axis.elements[:background].color = :transparent
     axis.xgridvisible = false
     axis.ygridvisible = false
     return

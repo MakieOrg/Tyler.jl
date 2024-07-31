@@ -7,12 +7,12 @@ function Base.show(io::IO, m::MIME"image/png", map::AbstractMap)
 end
 
 
-function remove_unused!(m::Map, tile::Tile)
+function remove_unused!(m::AbstractMap, tile::Tile)
     key = TileProviders.geturl(m.provider, tile.x, tile.y, tile.z)
     return remove_unused!(m, key)
 end
 
-function remove_unused!(m::Map, key::String)
+function remove_unused!(m::AbstractMap, key::String)
     plot_tile = get(m.plots, key, nothing)
     if !isnothing(plot_tile)
         plot, tile, bounds = plot_tile
