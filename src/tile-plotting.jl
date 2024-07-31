@@ -1,19 +1,19 @@
 # don't shift 3d plots
-move_in_front!(plot, bounds::Rect3) = nothing
-function move_in_front!(plot, bounds::Rect2)
+move_in_front!(plot, amount, ::Rect3) = nothing
+function move_in_front!(plot, amount, ::Rect2)
     if !hasproperty(plot, :depth_shift)
-        translate!(plot, 0, 0, 0)
+        translate!(plot, 0, 0, amount)
     else
-        plot.depth_shift = 0f0
+        plot.depth_shift = -amount / 100f0
     end
 end
 
-move_to_back!(plot, ::Rect3) = nothing
-function move_to_back!(plot, ::Rect2)
+move_to_back!(plot, amount, ::Rect3) = nothing
+function move_to_back!(plot, amount, ::Rect2)
     if !hasproperty(plot, :depth_shift)
-        translate!(plot, 0, 0, -100)
+        translate!(plot, 0, 0, -amount)
     else
-        plot.depth_shift = 0.1f0
+        plot.depth_shift = amount / 100f0
     end
 end
 
@@ -55,73 +55,77 @@ function get_bounds(tile::Tile, data, crs)
     return to_rect(bounds)
 end
 
-function create_tile_plot!(map::AbstractMap, tile::Tile, data)
+function remove_plot!(m::Map, key::String)
+    if !haskey(m.plots, key)
+        @warn "deleting non-existing plot"
+        delete!(m.should_be_plotted, key)
+        return
+    end
+    plot, _, _ = m.plots[key]
+    plot.visible = false
+    delete!(m.plots, key)
+    delete!(m.should_be_plotted, key)
+    push!(m.unused_plots, plot)
+end
+
+
+function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     # For providers which have to map the same data to different tiles
     # Or providers that have e.g. additional parameters like a date
     # the url is a much better key than the tile itself
     # TODO, should we instead have custom tiles for certain provider?
-    key = TileProviders.geturl(map.provider, tile.x, tile.y, tile.z)
+    key = tile_key(m.provider, tile)
     # This can happen for tile providers with overlapping data that doesn't map 1:1 to tiles
-    haskey(map.plots, key) && return
+    if haskey(m.plots, key)
+        println("huH!?")
+        return
+    end
 
-    cfg = map.plot_config
+    cfg = m.plot_config
     data_processed = cfg.preprocess(data)
-    bounds = get_bounds(tile, data_processed, map.crs)
+    bounds = get_bounds(tile, data_processed, m.crs)
     if bounds isa Rect3
         # for 3d meshes, we need to remove any plot in the same area
         # for 2d plots, we simply move the plot to the back
-        for (key, (plot, tile, cbounds)) in map.plots
-            if bounds in cbounds
-                delete!(map.plots, key)
-                push!(map.unused_plots, plot)
-                plot.visible = false
+        for (key, (plot, tile, cbounds)) in copy(m.plots)
+            if bounds in cbounds || cbounds in bounds
+                remove_plot!(m, key)
             end
         end
     end
     # Cull unused plots
-    if length(map.plots) > 200
+    if length(m.plots) > 200
         # remove the oldest plot
-        plotted_tiles = getindex.(values(map.plots), 2)
-        available_to_remove = setdiff(plotted_tiles, keys(map.current_tiles))
-        sort!(available_to_remove, by=tile-> abs(tile.z - map.zoom[]))
+        p_tiles = plotted_tiles(m)
+        available_to_remove = setdiff(p_tiles, keys(m.current_tiles))
+        sort!(available_to_remove, by=tile-> abs(tile.z - m.zoom[]))
         n_avail = length(available_to_remove)
         to_remove = available_to_remove[1:(n_avail - 200)]
         for tile in to_remove
-            plot_key = remove_unused!(map, tile)
+            plot_key = remove_unused!(m, tile)
             if !isnothing(plot_key)
-                plot_key[1].visible = false
-                push!(map.unused_plots, plot_key[1])
-                delete!(map.plots, plot_key[2])
+                remove_plot!(m, plot_key[2])
             end
         end
     end
 
-    if isempty(map.unused_plots)
-        mplot = create_tileplot!(cfg, map.axis, data_processed, bounds, (tile, map.crs))
+    if isempty(m.unused_plots)
+        mplot = create_tileplot!(cfg, m.axis, data_processed, bounds, (tile, m.crs))
     else
-        mplot = pop!(map.unused_plots)
-        update_tile_plot!(mplot, cfg, map.axis, data_processed, bounds, (tile, map.crs))
+        mplot = pop!(m.unused_plots)
+        update_tile_plot!(mplot, cfg, m.axis, data_processed, bounds, (tile, m.crs))
     end
 
-    if bounds isa Rect2
-        if haskey(map.current_tiles, tile)
-            move_in_front!(mplot, bounds)
-        else
-            move_to_back!(mplot, bounds)
-        end
+    if haskey(m.current_tiles, tile)
+        move_in_front!(mplot, abs(m.zoom[] - tile.z), bounds)
+    else
+        move_to_back!(mplot, abs(m.zoom[] - tile.z), bounds)
     end
+
     # Always move new plots to the front
     mplot.visible = true
     cfg.postprocess(mplot)
-    map.plots[key] = (mplot, tile, bounds)
-    # TODO, why do get some of the current_tiles stuck on a wrong depth_shift value?
-    for (key, (plot, tile, bounds)) in map.plots
-        if haskey(map.current_tiles, tile)
-            move_in_front!(plot, bounds)
-        else
-            move_to_back!(plot, bounds)
-        end
-    end
+    m.plots[key] = (mplot, tile, bounds)
     return
 end
 
@@ -146,7 +150,6 @@ function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::Elevatio
     # not so elegant with empty array, we may want to make this a bit nicer going forward
     color = isempty(data.color) ? (;) : (color=data.color,)
     mini, maxi = extrema(bounds)
-    @show mini maxi
     p = Makie.surface!(
         axis.scene,
         (mini[1], maxi[1]), (mini[2], maxi[2]), data.elevation;

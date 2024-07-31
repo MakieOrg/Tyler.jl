@@ -5,20 +5,21 @@ begin
     lat, lon = (52.395593, 4.884704)
     delta = 0.01
     ext = Rect2f(lon-delta/2, lat-delta/2, delta, delta)
-    m1 = Tyler.Map(ext)
+    m1 = Tyler.Map(ext; download_threads=3, fetching_scheme=Tyler.SimpleTiling())
     display(m1.figure.scene)
 end
+m1.axis.scene.plots |> length
+begin
+    lat, lon = (52.395593, 4.884704)
+    delta = 0.01
+    ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
+    m1 = Tyler.Map(ext; download_threads=1)
+    display(m1.figure.scene)
+end
+m1.zoom[]
 
-m1.tiles.tile_queue
-m1.current_tiles
-x = first(m1.plots)[2]
-m1.plots |> length
-
-lines!(m1.axis.scene, x[3])
-boundingbox(x[1])
 for (key, (pl, tile, rect)) in m1.plots
     if haskey(m1.current_tiles, tile)
-        println("buuh!")
     else
         @show pl.depth_shift[]
         lines!(m1.axis.scene, Rect2f(boundingbox(pl)); color=:black, depth_shift=-0.1f0)
@@ -33,10 +34,9 @@ for (tile, _) in m1.current_tiles
     key = TileProviders.geturl(m1.provider, tile.x, tile.y, tile.z)
     if haskey(m1.plots, key)
         pl, tile, rect = m1.plots[key]
-        @show pl.depth_shift[]
         lines!(m1.axis.scene, rect; depth_shift=-0.2f0, color=:red, linewidth=2)
     else
-        println("lol!")
+        println("not plotted")
     end
 end
 

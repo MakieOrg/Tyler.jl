@@ -189,5 +189,5 @@ end
 
 function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camera,Camera3D})
     points = frustrum_plane_intersection(cam, camc)
-    return tiles_from_poly(m, points)
+    return tiles_from_poly(m, points), OrderedSet{Tile}()
 end

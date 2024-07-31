@@ -8,31 +8,26 @@ end
 
 
 function remove_unused!(m::AbstractMap, tile::Tile)
-    key = TileProviders.geturl(m.provider, tile.x, tile.y, tile.z)
-    return remove_unused!(m, key)
+    return remove_unused!(m, tile_key(m.provider, tile))
 end
 
 function remove_unused!(m::AbstractMap, key::String)
     plot_tile = get(m.plots, key, nothing)
     if !isnothing(plot_tile)
         plot, tile, bounds = plot_tile
-        move_to_back!(plot, bounds)
+        move_to_back!(plot, abs(m.zoom[] - tile.z), bounds)
         return plot, key
-        if haskey(m.current_tiles, tile)
-            @warn "deleting tile that is still in use"
-        end
     end
     return nothing
 end
 
 function update_tileset!(m::AbstractMap, new_current_tiles::OrderedSet{Tile})
-    plotted_tiles = getindex.(values(m.plots), 2)
-    tile2key = Dict(zip(plotted_tiles, keys(m.plots)))
+    ptiles = plotted_tiles(m)
+    tile2key = Dict(zip(ptiles, keys(m.plots)))
     not_needed_anymore = setdiff(keys(m.current_tiles), new_current_tiles)
     for tile in not_needed_anymore
         if haskey(tile2key, tile)
             key = tile2key[tile]
-            # delete!(m.current_tiles, tile)
             remove_unused!(m, key)
         end
     end

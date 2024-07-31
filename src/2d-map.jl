@@ -6,6 +6,12 @@ struct Halo2DTiling <: FetchingScheme
     pixel_scale::Float64
 end
 
+Halo2DTiling(; depth=8, halo=0.2, pixel_scale=2.0) = Halo2DTiling(depth, halo, pixel_scale)
+
+function tile_key(provider::AbstractProvider, tile::Tile)
+    return TileProviders.geturl(provider, tile.x, tile.y, tile.z)
+end
+
 """
     Map
 
@@ -40,11 +46,16 @@ struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     figure::Figure
     axis::Ax
     plot_config::AbstractPlotConfig
-
+    # The tile downloader + cacher
     tiles::TileCache
+    # The tiles for the current zoom level - we may plot many more than this
     current_tiles::ThreadSafeDict{Tile, Bool}
+    # The plots we have created but are not currently visible and can be reused
     unused_plots::Vector{Makie.Plot}
+    # All tile plots we're currently plotting
     plots::ThreadSafeDict{String,Tuple{Makie.Plot,Tile, Rect}}
+    # All tiles we currently wish to be plotting, but may not yet be downloaded + displayed
+    should_be_plotted::ThreadSafeDict{String, Tile}
     display_task::Base.RefValue{Task}
 
     crs::CoordinateReferenceSystemFormat
@@ -76,8 +87,8 @@ function Map(extent, extent_crs=wgs84;
         provider=TileProviders.OpenStreetMap(:Mapnik),
         crs=MapTiles.web_mercator,
         cache_size_gb=5,
-        download_threads=Threads.nthreads() ÷ 3,
-        fetching_scheme = SimpleTiling(),
+        download_threads=min(1, Threads.nthreads() ÷ 3),
+        fetching_scheme=Halo2DTiling(),
         max_zoom=TileProviders.max_zoom(provider)
     )
 
@@ -91,6 +102,7 @@ function Map(extent, extent_crs=wgs84;
     downloaded_tiles = tiles.downloaded_tiles
 
     plots = ThreadSafeDict{String,Tuple{Makie.Plot,Tile,Rect}}()
+    should_be_plotted = ThreadSafeDict{String,Tile}()
     current_tiles = ThreadSafeDict{Tile, Bool}()
     unused_plots = Makie.Plot[]
     display_task = Base.RefValue{Task}()
@@ -105,6 +117,7 @@ function Map(extent, extent_crs=wgs84;
         current_tiles,
         unused_plots,
         plots,
+        should_be_plotted,
         display_task,
 
         crs,
@@ -114,9 +127,15 @@ function Map(extent, extent_crs=wgs84;
 
     map.zoom[] = 0
 
-    display_task[] = @async for (tile, img) in downloaded_tiles
+    display_task[] = @async for (tile, data) in downloaded_tiles
         try
-            create_tile_plot!(map, tile, img)
+            if isnothing(data)
+                # download went wrong or provider doesn't have tile.
+                # That means we won't plot this tile and it should not be in the queue anymore
+                delete!(map.should_be_plotted, tile_key(map.provider, tile))
+            else
+                create_tile_plot!(map, tile, data)
+            end
         catch e
             @warn "error while creating tile" exception = (e, Base.catch_backtrace())
         end
@@ -141,7 +160,8 @@ end
 function tile_reloader(map::Map{Axis}, first_area)
     axis = map.axis
     update_tiles!(map, first_area)
-    on(axis.scene, axis.finallimits) do extent
+    throttled = Makie.Observables.throttle(0.2, axis.finallimits)
+    on(axis.scene, throttled) do extent
         update_tiles!(map, extent)
         return
     end
@@ -169,25 +189,26 @@ function get_tiles_for_area(m::Map{Axis}, scheme::Halo2DTiling, area::Union{Rect
     # Define a halo around the area to download last, so pan/zoom are filled already
     halo_area = grow_extent(area, scheme.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
     # Define all the tiles in the order they will load in
-    areas = if Extents.intersects(mouse_halo_area, area)
+    background_areas = if Extents.intersects(mouse_halo_area, area)
         mha = Extents.intersection(mouse_halo_area, area)
         if Extents.intersects(mouse_area, area)
-            [Extents.intersection(mouse_area, area), mha, area, halo_area]
+            [Extents.intersection(mouse_area, area), mha, halo_area]
         else
-            [mha, area, halo_area]
+            [mha, halo_area]
         end
     else
-        [area, halo_area]
+        [halo_area]
     end
 
-    area_layers = OrderedSet{Tile}()
-
+    foreground = OrderedSet{Tile}(MapTiles.TileGrid(area, zoom, m.crs))
+    background = OrderedSet{Tile}()
     for z in layer_range
-        for ext in areas
-            union!(area_layers, MapTiles.TileGrid(ext, z, m.crs))
+        z == zoom && continue
+        for ext in background_areas
+            union!(background, MapTiles.TileGrid(ext, z, m.crs))
         end
     end
-    return area_layers
+    return foreground, background
 end
 
 struct SimpleTiling <: FetchingScheme
@@ -199,24 +220,48 @@ function get_tiles_for_area(m::Map, ::SimpleTiling, area::Union{Rect,Extent})
     # Calculate the zoom level
     zoom = optimal_zoom(m, diag)
     m.zoom[] = zoom
-    return OrderedSet{Tile}(MapTiles.TileGrid(area, zoom, m.crs))
+    return OrderedSet{Tile}(MapTiles.TileGrid(area, zoom, m.crs)), OrderedSet{Tile}()
+end
+
+function plotted_tiles(m::Map)
+    return getindex.(values(m.plots), 2)
+end
+
+function queue_plot!(m::Map, tile)
+    put!(m.tiles.tile_queue, tile)
+    m.should_be_plotted[tile_key(m.provider, tile)] = tile
+    return
 end
 
 function update_tiles!(m::Map, arealike)
     # Using an ordered set gives a smoother load than a Set
-    new_tiles_set = get_tiles_for_area(m, m.fetching_scheme, arealike)
+    new_tiles_set, background_tiles = get_tiles_for_area(m, m.fetching_scheme, arealike)
     # Remove any tiles not in the new set
-    to_add = setdiff(new_tiles_set, keys(m.current_tiles))
-    update_tileset!(m, new_tiles_set)
+    currently_plotted = values(m.should_be_plotted)
 
+    to_add = setdiff(new_tiles_set, currently_plotted)
+    # We don't add any background tile to the current_tiles, so they stay shifted to the back
+    # They get added async, so at this point `to_add` won't be in currently_plotted yet
+    will_be_plotted = union(new_tiles_set, currently_plotted)
+    # update_tileset!(m, new_tiles_set)
 
     # replace
     empty!(m.current_tiles)
     for tile in new_tiles_set
         m.current_tiles[tile] = true
     end
+    # Move all plots to the back, that aren't in the newest tileset anymore
+    for (key, (plot, tile, bounds)) in m.plots
+        if haskey(m.current_tiles, tile)
+            move_in_front!(plot, abs(m.zoom[] - tile.z), bounds)
+        else
+            move_to_back!(plot, abs(m.zoom[] - tile.z), bounds)
+        end
+    end
     # Queue tiles to be downloaded & displayed
-    foreach(tile -> put!(m.tiles.tile_queue, tile), to_add)
+    to_add_background = setdiff(background_tiles, will_be_plotted)
+    foreach(tile -> queue_plot!(m, tile), to_add)
+    foreach(tile -> queue_plot!(m, tile), to_add_background)
 end
 
 GeoInterface.crs(map::Map) = map.crs
