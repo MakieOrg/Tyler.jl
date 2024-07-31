@@ -48,12 +48,13 @@ function Map3D(extent, extent_crs=wgs84;
     )
 end
 
-function tile_reloader(map::Map{LScene}, area)
-    scene = map.axis.scene
+function tile_reloader(m::Map{LScene}, area)
+    scene = m.axis.scene
     camc = scene.camera_controls
-    throttled = Makie.Observables.throttle(0.2, scene.camera.projectionview)
+    update_signal = map((a,b)->nothing, camc.lookat, camc.eyeposition)
+    throttled = Makie.Observables.throttle(0.2, update_signal)
     on(scene, throttled; update=true) do _
-        update_tiles!(map, (scene.camera, camc))
+        update_tiles!(m, (scene.camera, camc))
         return
     end
 end
@@ -189,5 +190,10 @@ end
 
 function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camera,Camera3D})
     points = frustrum_plane_intersection(cam, camc)
+    eyepos = camc.eyeposition[]
+    maxdist, _ = findmax(p -> norm(p[3] .- eyepos), points)
+    mindist, _ = findmin(p -> norm(p[3] .- eyepos), points)
+    camc.far[] = maxdist * 1.5
+    camc.near[] = mindist * 0.0001
     return tiles_from_poly(m, points), OrderedSet{Tile}()
 end

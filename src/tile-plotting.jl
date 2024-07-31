@@ -84,10 +84,11 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     data_processed = cfg.preprocess(data)
     bounds = get_bounds(tile, data_processed, m.crs)
     if bounds isa Rect3
-        # for 3d meshes, we need to remove any plot in the same area
-        # for 2d plots, we simply move the plot to the back
+        # for 3d meshes, we need to remove any plot in the same 2d area
+        bounds2d = Rect2d(bounds)
         for (key, (plot, tile, cbounds)) in copy(m.plots)
-            if bounds in cbounds || cbounds in bounds
+            cbounds2d = Rect2d(cbounds)
+            if bounds2d in cbounds2d || cbounds2d in bounds2d
                 remove_plot!(m, key)
             end
         end

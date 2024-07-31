@@ -126,8 +126,10 @@ function Map(extent, extent_crs=wgs84;
     )
 
     map.zoom[] = 0
+    closed = Threads.Atomic{Bool}(false)
 
     display_task[] = @async for (tile, data) in downloaded_tiles
+        closed[] &&  break
         try
             if isnothing(data)
                 # download went wrong or provider doesn't have tile.
@@ -142,6 +144,14 @@ function Map(extent, extent_crs=wgs84;
     end
 
     tile_reloader(map, ext_target)
+
+    on(axis.scene.events.window_open) do open
+        if !open && !closed[]
+            closed[] = true
+            # remove all queued tiles!
+            cleanup_queue!(map, OrderedSet{Tile}())
+        end
+    end
     return map
 end
 
@@ -263,11 +273,12 @@ function update_tiles!(m::Map, arealike)
     # Queue tiles to be downloaded & displayed
     to_add_background = setdiff(background_tiles, will_be_plotted)
     # Remove any item from queue, that isn't in the new set
-    cleanup_queue!(m, union(to_add, to_add_background))
+    to_keep = union(background_tiles, will_be_plotted)
+    cleanup_queue!(m, to_keep)
     # The unique is needed to avoid tiles referencing the same tile
     # TODO, we should really consider to disallow this for tile providers, currently only allowed because of the PointCloudProvider
     foreach(tile -> queue_plot!(m, tile), unique(t-> tile_key(m.provider, t), to_add))
-    foreach(tile -> queue_plot!(m, tile), unique(t-> tile_key(m.provider, t),to_add_background))
+    foreach(tile -> queue_plot!(m, tile), unique(t -> tile_key(m.provider, t), to_add_background))
 end
 
 GeoInterface.crs(map::Map) = map.crs

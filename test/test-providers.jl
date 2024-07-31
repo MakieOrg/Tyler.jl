@@ -1,4 +1,4 @@
-using GeometryBasics, GLMakie, Tyler
+using GeometryBasics, GLMakie, Tyler, TileProviders
 using Tyler: ElevationProvider, GeoTilePointCloudProvider
 
 begin
@@ -16,7 +16,6 @@ begin
     m1 = Tyler.Map(ext; download_threads=1)
     display(m1.figure.scene)
 end
-m1.zoom[]
 
 for (key, (pl, tile, rect)) in m1.plots
     if haskey(m1.current_tiles, tile)
@@ -40,30 +39,21 @@ for (tile, _) in m1.current_tiles
     end
 end
 
-for tile in new_tiles
-    rect = Tyler.to_rect(MapTiles.extent(tile, m1.crs))
-    lines!(m1.axis.scene, rect; depth_shift=-0.2f0, color=:red, linewidth=2)
-end
 
-for (key, (pl, tile, rect)) in m1.plots
-    if tile in m1.current_tiles
-        pl.depth_shift[] = 0.0f0
-    else
-        pl.depth_shift[] = 0.1f0
-    end
-end
 
 begin
     # lat, lon = (40.697211, -74.037523)
     lat, lon = (52.395593, 4.884704)
     # lat, lon = (53.208252, 5.169539)
     # lat, lon = (55.648466, 12.566546)
-    # lat, lon = (47.087441, 13.377214)
+    lat, lon = (47.087441, 13.377214)
     delta = 0.1
     ext = Rect2f(lon-delta/2, lat-delta/2, delta, delta)
     m = Tyler.Map3D(ext; provider=ElevationProvider())
     display(m.figure.scene)
 end
+m.axis.scene.camera_controls.far[] = 10000f0
+m.axis.scene.camera_controls.near[] = 1000f0
 
 
 begin
@@ -74,11 +64,36 @@ begin
         preprocess=pc -> map(point-> point .* Point3f(1, 1, 5), pc),
         postprocess=p -> translate!(p, 0, 0, 40),
     )
-    provider = GeoTilePointCloudProvider()
+    subset="AHN1_T" # Takes reasonably long to load (~1-5mb compressed per tile)
+    subset="AHN4_T" # Takes _really_ long to load, even from disk (~300mb compressed points per tile)
+    provider = GeoTilePointCloudProvider(subset=subset)
+    image = TileProviders.Esri(:WorldImagery)
     m1 = Tyler.Map3D(ext; provider=provider, plot_config=cfg)
-    m2 = Tyler.Map3D(ext; figure=m1.figure, axis=m1.axis)
+    m2 = Tyler.Map3D(ext; figure=m1.figure, axis=m1.axis, provider=image)
     # m1 = Tyler.Map3D(ext; plot_config=Tyler.DebugPlotConfig())
     display(m1.figure.scene)
 end
 
-m1.tiles.tile_queue
+function cleanup_queue!(queue, to_keep)
+    lock(queue) do
+        queued = queue.data
+        filter!(queued) do tile
+            if !(tile in to_keep)
+                Base._increment_n_avail(queue, -1)
+                return false
+            else
+                return true
+            end
+        end
+    end
+end
+
+channel = Channel{Int}(Inf) do ch
+    for el in ch
+        println("got $el")
+        sleep(0.5)
+    end
+end
+foreach(i-> put!(channel, i), 1:1000)
+
+cleanup_queue!(channel, [])
