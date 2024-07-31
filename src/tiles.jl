@@ -7,13 +7,13 @@ end
 
 get_tile_format(provider) = Matrix{RGB{N0f8}}
 
-function TileCache(provider; cache_size_gb=5, nthreads=Threads.nthreads() / 3)
+function TileCache(provider; cache_size_gb=5, download_threads=Threads.nthreads() ÷ 3)
     TileFormat = get_tile_format(provider)
     fetched_tiles = LRU{String,TileFormat}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
     downloaded_tiles = Channel{Tuple{Tile,TileFormat}}(Inf)
 
     tile_queue = Channel{Tile}(Inf)
-    for thread in 1:nthreads
+    for thread in 1:download_threads
         Threads.@spawn for tile in tile_queue
             try
                 @debug("downloading tile on thread $(Threads.threadid())")

@@ -76,6 +76,7 @@ function Map(extent, extent_crs=wgs84;
         provider=TileProviders.OpenStreetMap(:Mapnik),
         crs=MapTiles.web_mercator,
         cache_size_gb=5,
+        download_threads=Threads.nthreads() ÷ 3,
         fetching_scheme = SimpleTiling(),
         max_zoom=TileProviders.max_zoom(provider)
     )
@@ -86,7 +87,7 @@ function Map(extent, extent_crs=wgs84;
     ext_target = MapTiles.project_extent(extent, extent_crs, crs)
     setup_axis!(axis, ext_target)
 
-    tiles = TileCache(provider; cache_size_gb=cache_size_gb)
+    tiles = TileCache(provider; cache_size_gb=cache_size_gb, download_threads=download_threads)
     downloaded_tiles = tiles.downloaded_tiles
 
     plots = ThreadSafeDict{String,Tuple{Makie.Plot,Tile,Rect}}()
