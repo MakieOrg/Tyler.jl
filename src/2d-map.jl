@@ -228,8 +228,10 @@ function plotted_tiles(m::Map)
 end
 
 function queue_plot!(m::Map, tile)
+    key = tile_key(m.provider, tile)
+    isnothing(key) && return
+    m.should_be_plotted[key] = tile
     put!(m.tiles.tile_queue, tile)
-    m.should_be_plotted[tile_key(m.provider, tile)] = tile
     return
 end
 
@@ -260,8 +262,12 @@ function update_tiles!(m::Map, arealike)
     end
     # Queue tiles to be downloaded & displayed
     to_add_background = setdiff(background_tiles, will_be_plotted)
-    foreach(tile -> queue_plot!(m, tile), to_add)
-    foreach(tile -> queue_plot!(m, tile), to_add_background)
+    # Remove any item from queue, that isn't in the new set
+    cleanup_queue!(m, union(to_add, to_add_background))
+    # The unique is needed to avoid tiles referencing the same tile
+    # TODO, we should really consider to disallow this for tile providers, currently only allowed because of the PointCloudProvider
+    foreach(tile -> queue_plot!(m, tile), unique(t-> tile_key(m.provider, t), to_add))
+    foreach(tile -> queue_plot!(m, tile), unique(t-> tile_key(m.provider, t),to_add_background))
 end
 
 GeoInterface.crs(map::Map) = map.crs

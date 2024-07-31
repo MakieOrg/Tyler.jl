@@ -24,13 +24,18 @@ function get_ahn_sub_mapping()
 end
 
 function GeoTilePointCloudProvider(; baseurl="https://geotiles.citg.tudelft.nl", subset="AHN1_T")
-
     projs = [Proj.Transformation(GFT.EPSG(28992), GFT.EPSG(3857)) for i in 1:Threads.nthreads()]
     return GeoTilePointCloudProvider(baseurl, subset, get_ahn_sub_mapping(), projs)
 end
 
+function get_downloader(::GeoTilePointCloudProvider)
+    cache_dir = joinpath(CACHE_PATH[], "GeoTilePointCloudProvider")
+    return PathDownloader(cache_dir)
+end
+
+file_ending(::GeoTilePointCloudProvider) = ".laz"
+
 function TileProviders.geturl(p::GeoTilePointCloudProvider, x::Integer, y::Integer, z::Integer)
-    println("$((x, y, z))> $(haskey(p.lookup, (x, y)))")
     if z == TileProviders.min_zoom(p) && haskey(p.lookup, (x, y))
         return string(p.baseurl, "/", p.subset, "/", p.lookup[(x, y)], ".LAZ")
     end
@@ -44,17 +49,7 @@ function get_points(las, offset, scale, proj)
     end
 end
 
-CACHE_PATH = joinpath(@__DIR__, "netherlands", "cache-ahn1")
-
-function fetch_tile(provider::GeoTilePointCloudProvider, tile::Tile)
-    url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
-    isnothing(url) && return nothing
-    dir = joinpath(CACHE_PATH, provider.subset)
-    isdir(dir) || mkpath(dir)
-    path = joinpath(dir, "$(tile.x)_$(tile.y)_$(tile.z).laz")
-    if !isfile(path)
-        Downloads.download(url, path)
-    end
+function load_tile_data(provider::GeoTilePointCloudProvider, path::String)
     pc = LAS(path)
     isempty(pc.points) && return nothing
     proj = provider.projs[Threads.threadid()]

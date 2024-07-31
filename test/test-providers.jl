@@ -8,7 +8,7 @@ begin
     m1 = Tyler.Map(ext; download_threads=3, fetching_scheme=Tyler.SimpleTiling())
     display(m1.figure.scene)
 end
-m1.axis.scene.plots |> length
+
 begin
     lat, lon = (52.395593, 4.884704)
     delta = 0.01
@@ -73,7 +73,6 @@ begin
     cfg = Tyler.PlotConfig(
         preprocess=pc -> map(point-> point .* Point3f(1, 1, 5), pc),
         postprocess=p -> translate!(p, 0, 0, 40),
-        color=(:black, 0.1), transparency=true
     )
     provider = GeoTilePointCloudProvider()
     m1 = Tyler.Map3D(ext; provider=provider, plot_config=cfg)
@@ -81,3 +80,5 @@ begin
     # m1 = Tyler.Map3D(ext; plot_config=Tyler.DebugPlotConfig())
     display(m1.figure.scene)
 end
+
+m1.tiles.tile_queue

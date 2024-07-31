@@ -18,7 +18,10 @@ end
 Interpolator(f; colormap=:thermal, options=Dict(:minzoom=>1, :maxzoom=>19)) =
     Interpolator(f, Makie.to_colormap(colormap), options)
 
-function fetch_tile(interpolator::Interpolator, tile::Tile)
+
+get_downloader(::Interpolator) = NoDownload()
+
+function fetch_tile(interpolator::Interpolator, ::NoDownload, tile::Tile)
     (lon, lat) = _tile2positions(tile)
     z = permutedims(interpolator.interpolator.(lon, lat))
     return [_col(interpolator, i) for i in z]

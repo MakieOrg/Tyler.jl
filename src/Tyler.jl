@@ -22,12 +22,20 @@ using PointClouds
 using ArchGDAL
 import GeoFormatTypes as GFT
 using Downloads
+using Scratch
 
+const CACHE_PATH = Ref("")
+
+function __init__()
+    # Initialize at init for relocatability
+    CACHE_PATH[] = @get_scratch!("download-cache")
+end
 
 abstract type AbstractPlotConfig end
 abstract type FetchingScheme end
 abstract type AbstractMap end
 
+include("downloader.jl")
 include("interpolations.jl")
 include("tiles.jl")
 include("map.jl")

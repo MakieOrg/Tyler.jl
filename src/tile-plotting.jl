@@ -77,7 +77,6 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     key = tile_key(m.provider, tile)
     # This can happen for tile providers with overlapping data that doesn't map 1:1 to tiles
     if haskey(m.plots, key)
-        println("huH!?")
         return
     end
 
