@@ -4,8 +4,12 @@ end
 using GeometryBasics, LinearAlgebra
 
 function setup_axis!(axis::LScene, ext_target)
-    X = ext_target.X
-    Y = ext_target.Y
+    mini = Point3(600_00.0, 600_00.0, 0)
+    scale = Point3(18000.0, 18000.0, 1.0)
+    X = (ext_target.X )
+    Y = (ext_target.Y )
+    X = (ext_target.X .- mini[[1, 2]]) ./ scale[1]
+    Y = (ext_target.Y .- mini[[1, 2]]) ./ scale[1]
     pmin = Vec3(X[1], Y[1], 0)
     xrange = X[2] - X[1]
     center = Vec3((X[1] + X[2]) / 2, (Y[1] + Y[2]) / 2, 0)
@@ -14,14 +18,14 @@ function setup_axis!(axis::LScene, ext_target)
     up = cross(xaxis, center .- eyeposition)
     cam = axis.scene.camera_controls
     cam.settings.clipping_mode[] = :static
-
-    cam.near[] = 10f0
-    cam.far[] = xrange * 100f0
     cam.controls.fix_x_key[] = true
     cam.controls.fix_y_key[] = true
     cam.settings.circular_rotation[] = (false, false, false)
     cam.settings.fixed_axis[] = true
     cam.settings.rotation_center[] = :eyeposition
+    axis.scene.transformation.transform_func[] = Makie.PointTrans{3}() do point
+        return (point .- mini) ./ scale
+    end
     update_cam!(axis.scene, eyeposition, center, up)
     return
 end
@@ -59,27 +63,13 @@ function tile_reloader(m::Map{LScene}, area)
     end
 end
 
-function get_extent(map::Map{LScene})
-    scene = map.axis.scene
-    cam = scene.camera_controls
-    position = cam.eyeposition[]
-    lookat = cam.lookat[]
-    x, y, _ = lookat
-    z = position[3]
-    return Rect2f(x - z, y - z, 2 * z, 2 * z)
-end
-
-using LinearAlgebra, GeometryBasics
-using GeometryBasics: Point4d, Point3d
 
 function frustum_snapshot(cam::Camera)
     bottom_left = Point4d(-1, -1, 1, 1)
     top_left = Point4d(-1, 1, 1, 1)
     top_right = Point4d(1, 1, 1, 1)
     bottom_right = Point4d(1, -1, 1, 1)
-
     rect_ps = [bottom_left, top_left, top_right, bottom_right]
-
     inv_pv = inv(cam.projectionview[])
     return map(rect_ps) do p
         p = inv_pv * p
@@ -110,7 +100,7 @@ function frustrum_plane_intersection(cam::Camera, camc::Camera3D)
     result = Union{Nothing, Point3d}[]
     eyepos = camc.eyeposition[]
     for point in frustrum
-        res = ray_plane_intersection(Point3f(0), Vec3f(0, 0, 1), Point3f(eyepos), Vec3f(point .- eyepos))
+        res = ray_plane_intersection(Point3d(0), Vec3d(0, 0, 1), Point3d(eyepos), Vec3d(point .- eyepos))
         push!(result, res)
     end
     x, y, _ = camc.lookat[]
@@ -190,10 +180,14 @@ end
 
 function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camera,Camera3D})
     points = frustrum_plane_intersection(cam, camc)
+
     eyepos = camc.eyeposition[]
     maxdist, _ = findmax(p -> norm(p[3] .- eyepos), points)
     mindist, _ = findmin(p -> norm(p[3] .- eyepos), points)
     camc.far[] = maxdist * 1.5
     camc.near[] = mindist * 0.0001
+    mini = Point3(600_00.0, 600_00.0, 0)
+    scale = Point3(18000.0, 18000.0, 1.0)
+    points = map(p -> (p .* scale) .+ mini, points)
     return tiles_from_poly(m, points), OrderedSet{Tile}()
 end

@@ -3,7 +3,7 @@ module Tyler
 using Colors: Colors, RGB, N0f8, Colorant
 using Extents: Extents, Extent
 using GeoInterface: GeoInterface
-using GeometryBasics: GeometryBasics, GLTriangleFace, Point2f, Vec2f, Rect2f, Rect2, Rect, decompose, decompose_uv, Vec3d, Point2d
+using GeometryBasics: GeometryBasics, GLTriangleFace, Point2f, Vec2f, Rect2f, Rect2, Rect, decompose, decompose_uv, Vec3d, Point2d, Point3d, Point4d
 using HTTP: HTTP
 using ImageMagick: ImageMagick
 using LRUCache: LRUCache, LRU
