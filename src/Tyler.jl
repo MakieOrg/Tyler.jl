@@ -5,7 +5,6 @@ using Extents: Extents, Extent
 using GeoInterface: GeoInterface
 using GeometryBasics: GeometryBasics, GLTriangleFace, Point2f, Vec2f, Rect2f, Rect2, Rect, decompose, decompose_uv, Vec3d, Point2d, Point3d, Point4d
 using HTTP: HTTP
-using ImageMagick: ImageMagick
 using LRUCache: LRUCache, LRU
 using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
 using Makie: Makie, Observable, Figure, Axis, LScene, RGBAf, on, isopen, meta, mesh!, translate!, scale!, Plot
@@ -23,6 +22,8 @@ using ArchGDAL
 import GeoFormatTypes as GFT
 using Downloads
 using Scratch
+using ImageIO, FileIO
+
 
 const CACHE_PATH = Ref("")
 

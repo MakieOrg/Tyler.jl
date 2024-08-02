@@ -72,7 +72,9 @@ function fetch_tile(provider::AbstractProvider, downloader::AbstractDownloader, 
 end
 
 function load_tile_data(::AbstractProvider, downloaded::AbstractVector{UInt8})
-    return ImageMagick.readblob(downloaded)
+    io = IOBuffer(downloaded)
+    format = FileIO.query(io)  # this interrogates the magic bits to see what file format it is (JPEG, PNG, etc)
+    return FileIO.load(format)
 end
 
 function Base.wait(tiles::TileCache)
