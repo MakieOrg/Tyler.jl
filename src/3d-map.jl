@@ -3,28 +3,37 @@ struct Tiling3D <: FetchingScheme
 end
 using GeometryBasics, LinearAlgebra
 
+const SCALE_ADD = Ref(Point3d(540773, 540773, 0))
+const SCALE_DIV = Ref(5000.31)
+
 function setup_axis!(axis::LScene, ext_target)
-    mini = Point3(600_00.0, 600_00.0, 0)
-    scale = Point3(18000.0, 18000.0, 1.0)
+    # Disconnect all events
+    scene = axis.scene
+    cam = scene.camera_controls
+    Makie.disconnect!(scene.camera)
+    # add back our mouse controls
+    add_tyler_mouse_controls!(scene, cam)
+
     X = (ext_target.X )
     Y = (ext_target.Y )
-    X = (ext_target.X .- mini[[1, 2]]) ./ scale[1]
-    Y = (ext_target.Y .- mini[[1, 2]]) ./ scale[1]
+    X = (ext_target.X .- SCALE_ADD[][[1, 2]]) ./ SCALE_DIV[]
+    Y = (ext_target.Y .- SCALE_ADD[][[1, 2]]) ./ SCALE_DIV[]
     pmin = Vec3(X[1], Y[1], 0)
     xrange = X[2] - X[1]
     center = Vec3((X[1] + X[2]) / 2, (Y[1] + Y[2]) / 2, 0)
     xaxis = Vec3(xrange / 2, 0, 0)
     eyeposition = pmin .+ xaxis .+ Vec3(0, 0, 0.8 * xrange)
     up = cross(xaxis, center .- eyeposition)
-    cam = axis.scene.camera_controls
+
     cam.settings.clipping_mode[] = :static
+    cam.controls.fix_x_key[] = true
     cam.controls.fix_x_key[] = true
     cam.controls.fix_y_key[] = true
     cam.settings.circular_rotation[] = (false, false, false)
     cam.settings.fixed_axis[] = true
     cam.settings.rotation_center[] = :eyeposition
     axis.scene.transformation.transform_func[] = Makie.PointTrans{3}() do point
-        return (point .- mini) ./ scale
+        return (point .- SCALE_ADD[]) ./ SCALE_DIV[]
     end
     update_cam!(axis.scene, eyeposition, center, up)
     return
@@ -180,14 +189,11 @@ end
 
 function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camera,Camera3D})
     points = frustrum_plane_intersection(cam, camc)
-
     eyepos = camc.eyeposition[]
     maxdist, _ = findmax(p -> norm(p[3] .- eyepos), points)
-    mindist, _ = findmin(p -> norm(p[3] .- eyepos), points)
     camc.far[] = maxdist * 1.5
-    camc.near[] = mindist * 0.0001
-    mini = Point3(600_00.0, 600_00.0, 0)
-    scale = Point3(18000.0, 18000.0, 1.0)
-    points = map(p -> (p .* scale) .+ mini, points)
+    camc.near[] = eyepos[3] * 0.001
+
+    points = map(p -> (p .* SCALE_DIV[]) .+ SCALE_ADD[], points)
     return tiles_from_poly(m, points), OrderedSet{Tile}()
 end

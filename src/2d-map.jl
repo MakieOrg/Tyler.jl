@@ -62,6 +62,7 @@ struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     zoom::Observable{Int}
     fetching_scheme::FetchingScheme
     max_zoom::Int
+    max_plots::Int
 end
 
 setup_axis!(::Makie.AbstractAxis, ext_target) = nothing
@@ -89,7 +90,9 @@ function Map(extent, extent_crs=wgs84;
         cache_size_gb=5,
         download_threads=min(1, Threads.nthreads() ÷ 3),
         fetching_scheme=Halo2DTiling(),
-        max_zoom=TileProviders.max_zoom(provider)
+        max_zoom=TileProviders.max_zoom(provider),
+        max_plots=200,
+
     )
 
     # Extent
@@ -122,7 +125,7 @@ function Map(extent, extent_crs=wgs84;
 
         crs,
         Observable(1),
-        fetching_scheme, max_zoom
+        fetching_scheme, max_zoom, max_plots
     )
 
     map.zoom[] = 0

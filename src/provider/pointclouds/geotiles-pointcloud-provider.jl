@@ -24,7 +24,7 @@ function get_ahn_sub_mapping()
 end
 
 function GeoTilePointCloudProvider(; baseurl="https://geotiles.citg.tudelft.nl", subset="AHN1_T")
-    projs = [Proj.Transformation(GFT.EPSG(28992), GFT.EPSG(5070)) for i in 1:Threads.nthreads()]
+    projs = [Proj.Transformation(GFT.EPSG(28992), GFT.EPSG(3857)) for i in 1:Threads.nthreads()]
     return GeoTilePointCloudProvider(baseurl, subset, get_ahn_sub_mapping(), projs)
 end
 
@@ -55,9 +55,6 @@ function load_tile_data(provider::GeoTilePointCloudProvider, path::String)
     proj = provider.projs[Threads.threadid()]
     points = get_points(pc, Point3f(pc.coord_offset), Point3f(pc.coord_scale), proj)
     extrema = Point3f.(proj.(Point3f[pc.coord_min, pc.coord_max]))
-    diag_len = norm(extrema[2] .- extrema[1])
-    approx_points_in_diag = sqrt(length(pc.points)) * sqrt(2)
-    msize = (diag_len / approx_points_in_diag) .* 1.5
     if hasproperty(pc.points[1], :color_channels)
         color = map(pc.points) do p
             c = map(x -> N0f8(x / 255), p.color_channels)
@@ -66,5 +63,12 @@ function load_tile_data(provider::GeoTilePointCloudProvider, path::String)
     else
         color = last.(points) # z as fallback
     end
-    return PointCloudData(points, color, Rect3d(extrema[1], extrema[2] .- extrema[1]), msize)
+    best_markersize = Dict(
+        "AHN1_T" => 5.0,
+        "AHN2_T" => 2.0,
+        "AHN3_T" => 1.5,
+        "AHN4_T" => 1.0
+    )
+    bb = Rect3d(extrema[1], extrema[2] .- extrema[1])
+    return PointCloudData(points, color, bb, best_markersize[provider.subset])
 end

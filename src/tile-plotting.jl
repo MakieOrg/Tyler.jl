@@ -93,8 +93,9 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
             end
         end
     end
+
     # Cull unused plots
-    if length(m.plots) > 200
+    if length(m.plots) > m.max_plots
         # remove the oldest plot
         p_tiles = plotted_tiles(m)
         available_to_remove = setdiff(p_tiles, keys(m.current_tiles))
@@ -136,6 +137,13 @@ end
 struct ElevationData
     elevation::AbstractMatrix{<: Number}
     color::AbstractMatrix{<: Colorant}
+end
+
+function Base.map(f::Function, data::ElevationData)
+    return ElevationData(
+        map(f, data.elevation),
+        data.color
+    )
 end
 
 function get_bounds(tile::Tile, data::ElevationData, crs)
@@ -220,12 +228,14 @@ function Base.map(f::Function, data::PointCloudData)
     )
 end
 
-function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::PointCloudData, bounds::Rect, tile_crs)
+function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::PointCloudData, ::Rect, tile_crs)
+    msize = ((data.msize) / SCALE_DIV[])
     p = Makie.scatter!(
         axis.scene, data.points;
         color=data.color,
-        marker=Makie.FastPixel(),
-        markersize=data.msize, markerspace=:data,
+        marker=Makie.FastPixel(3),
+        markersize=msize,
+        markerspace=:data,
         fxaa=false,
         inspectable=false,
         config.attributes...

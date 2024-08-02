@@ -20,7 +20,7 @@ end
 function TileProviders.geturl(::ElevationProvider, x::Integer, y::Integer, z::Integer)
     return "https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer/tile/$(z)/$(y)/$(x)"
 end
-https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer/tile/1/1/1
+
 function get_downloader(::ElevationProvider)
     cache_dir = joinpath(CACHE_PATH[], "ElevationProvider")
     return PathDownloader(cache_dir)
@@ -30,11 +30,11 @@ file_ending(::ElevationProvider) = ".lerc"
 
 function fetch_tile(provider::ElevationProvider, dl::PathDownloader, tile::Tile)
     path = download_tile_data(dl, provider, TileProviders.geturl(provider, tile.x, tile.y, tile.z))
-    dataset = ArchGDAL.read(path)
-    img = ArchGDAL.imread(dataset)
+    dataset = ArchGDAL.read(path, options=["DATATYPE=Float32"])
+    band = ArchGDAL.getband(dataset, 1)
     mini = -450
     maxi = 8700
-    elevation_img = Float32.(rotr90(img)) .* -0.01f0 # .* (maxi - mini) .+ mini
+    elevation_img = Float32.(reverse(band; dims=2) ./ 8700.0f0) # .* (maxi - mini) .+ mini
 
     if isnothing(provider.color_provider)
         return Tyler.ElevationData(elevation_img, RGBf[])
