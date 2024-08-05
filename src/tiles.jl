@@ -31,7 +31,7 @@ end
 function TileCache(provider; cache_size_gb=5, download_threads=min(1, Threads.nthreads() ÷ 3))
     TileFormat = get_tile_format(provider)
     downloader = [get_downloader(provider) for i in 1:download_threads]
-    fetched_tiles = LRU{String,TileFormat}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
+    fetched_tiles = LRU{String,TileFormat}(; maxsize=cache_size_gb * 10^9, by=Base.summarysize)
     downloaded_tiles = Channel{Tuple{Tile,Union{Nothing, TileFormat}}}(Inf)
 
     tile_queue = Channel{Tile}(Inf)

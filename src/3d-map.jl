@@ -1,6 +1,4 @@
 
-struct Tiling3D <: FetchingScheme
-end
 using GeometryBasics, LinearAlgebra
 
 const SCALE_ADD = Ref(Point3d(540773, 540773, 0))
@@ -131,7 +129,7 @@ function to_rect(extent::Extent)
 end
 
 function optimal_zoom(m::Map, diagonal)
-    diagonal_res = norm(get_resolution(m)) * 0.6
+    diagonal_res = norm(get_resolution(m)) * 0.7
     zoomrange = min_zoom(m):max_zoom(m)
     optimal_zoom(m.crs, diagonal, diagonal_res, zoomrange, m.zoom[])
 end
@@ -163,7 +161,6 @@ function optimal_zoom(crs, diagonal, diagonal_resolution, zoom_range, old_zoom)
     return candidates[idx].z
 end
 
-import GeometryOps as GO
 
 function tiles_from_poly(m::Map, points)
     mini = minimum(points)
@@ -185,15 +182,4 @@ function tiles_from_poly(m::Map, points)
         end
     end
     return tiles
-end
-
-function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camera,Camera3D})
-    points = frustrum_plane_intersection(cam, camc)
-    eyepos = camc.eyeposition[]
-    maxdist, _ = findmax(p -> norm(p[3] .- eyepos), points)
-    camc.far[] = maxdist * 1.5
-    camc.near[] = eyepos[3] * 0.001
-
-    points = map(p -> (p .* SCALE_DIV[]) .+ SCALE_ADD[], points)
-    return tiles_from_poly(m, points), OrderedSet{Tile}()
 end

@@ -1,8 +1,6 @@
 using Makie: ray_assisted_pick, @extract, mouseposition_px, parent_scene, screen_relative
 
-
 function translate_cam!(scene, cam::Camera3D, shift::Vec3d)
-
     fb = cam.lookat[] .- cam.eyeposition[]
     dir_left_right = normalize(cross(fb, cam.upvector[])) .* shift[1]
     dir_front_back = normalize(Vec3(fb[1], fb[2], 0)) .* shift[2]
@@ -11,7 +9,6 @@ function translate_cam!(scene, cam::Camera3D, shift::Vec3d)
     cam.lookat[] += dir
     update_cam!(scene, cam)
 end
-
 
 
 function _zoom!(scene, cam::Camera3D, zoom_step)
@@ -28,11 +25,6 @@ function _zoom!(scene, cam::Camera3D, zoom_step)
     ldistance = norm(direction)
 
     cam.lookat[] = lookat .+ ((ldistance / 15) .* s .* normalize(direction))
-    #=
-    lookdir = eyepos .- cam.lookat[]
-    lookdir = normalize(Vec3(lookdir[1], lookdir[2], 0))
-    cam.lookat[] = cam.lookat[] .- lookdir .* s .* zoom_step .* falloff
-    =#
 
     update_cam!(scene, cam)
     return

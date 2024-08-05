@@ -68,7 +68,6 @@ function remove_plot!(m::Map, key::String)
     push!(m.unused_plots, plot)
 end
 
-
 function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     # For providers which have to map the same data to different tiles
     # Or providers that have e.g. additional parameters like a date
@@ -77,6 +76,7 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     key = tile_key(m.provider, tile)
     # This can happen for tile providers with overlapping data that doesn't map 1:1 to tiles
     if haskey(m.plots, key)
+        delete!(m.should_be_plotted, key)
         return
     end
 
@@ -86,10 +86,25 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     if bounds isa Rect3
         # for 3d meshes, we need to remove any plot in the same 2d area
         bounds2d = Rect2d(bounds)
-        for (key, (plot, tile, cbounds)) in copy(m.plots)
-            cbounds2d = Rect2d(cbounds)
-            if bounds2d in cbounds2d || cbounds2d in bounds2d
-                remove_plot!(m, key)
+        for (other_key, (plot, other_tile, other_bounds)) in copy(m.plots)
+            other_bounds2d = Rect2d(other_bounds)
+            if bounds2d in other_bounds2d || other_bounds2d in bounds2d
+                if haskey(m.current_tiles, tile)
+                    # the new plot has priority since it's in the newest current tile set
+                    remove_plot!(m, other_key)
+                elseif haskey(m.current_tiles, other_tile)
+                    delete!(m.should_be_plotted, key)
+                    # the existing plot has priority so we skip the new plot
+                    return
+                else
+                    # If both are not in current_tiles, we remove the plot farthest away from the current zoom level
+                    if abs(tile.z - m.zoom[]) <= abs(other_tile.z - m.zoom[])
+                        remove_plot!(m, other_key)
+                    else
+                        delete!(m.should_be_plotted, key)
+                        return
+                    end
+                end
             end
         end
     end
@@ -101,7 +116,8 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
         available_to_remove = setdiff(p_tiles, keys(m.current_tiles))
         sort!(available_to_remove, by=tile-> abs(tile.z - m.zoom[]))
         n_avail = length(available_to_remove)
-        to_remove = available_to_remove[1:(n_avail - 200)]
+        need_to_remove = min(n_avail, length(m.plots) - m.max_plots)
+        to_remove = available_to_remove[1:need_to_remove]
         for tile in to_remove
             plot_key = remove_unused!(m, tile)
             if !isnothing(plot_key)

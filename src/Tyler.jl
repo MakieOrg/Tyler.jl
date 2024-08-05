@@ -23,6 +23,7 @@ import GeoFormatTypes as GFT
 using Downloads
 using Scratch
 using ImageIO, FileIO
+import GeometryOps as GO
 
 
 const CACHE_PATH = Ref("")
@@ -37,32 +38,15 @@ abstract type FetchingScheme end
 abstract type AbstractMap end
 
 include("downloader.jl")
-include("interpolations.jl")
 include("tiles.jl")
 include("map.jl")
-include("2d-map.jl")
 include("3d-map.jl")
 include("tyler-cam3d.jl")
 include("tile-plotting.jl")
+include("tile-fetching.jl")
+include("provider/interpolations.jl")
 include("provider/elevation/elevation-provider.jl")
 include("provider/pointclouds/geotiles-pointcloud-provider.jl")
 
-function z_index(extent::Union{Rect,Extent}, res::Tuple, crs)
-    # Calculate the number of tiles at each z and get the one
-    # closest to the resolution `res`
-    target_ntiles = prod(map(r -> r / 256, res))
-    tiles_at_z = map(1:24) do z
-        length(TileGrid(extent, z, crs))
-    end
-    return findmin(x -> abs(x - target_ntiles), tiles_at_z)[2]
-end
-
-function grow_extent(area::Union{Rect,Extent}, factor)
-    Extent(map(Extents.bounds(area)) do axis_bounds
-        span = axis_bounds[2] - axis_bounds[1]
-        pad = factor * span / 2
-        return (axis_bounds[1] - pad, axis_bounds[2] + pad)
-    end)
-end
 
 end

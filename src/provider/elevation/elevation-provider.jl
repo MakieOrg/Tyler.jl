@@ -34,8 +34,8 @@ function fetch_tile(provider::ElevationProvider, dl::PathDownloader, tile::Tile)
     band = ArchGDAL.getband(dataset, 1)
     mini = -450
     maxi = 8700
-    elevation_img = Float32.(reverse(band; dims=2) ./ 8700.0f0) # .* (maxi - mini) .+ mini
-
+    elevation_img = collect(reverse(band; dims=2))
+    elevation_img .= Float32.(elevation_img) ./ 8700.0f0 # .* (maxi - mini) .+ mini
     if isnothing(provider.color_provider)
         return Tyler.ElevationData(elevation_img, RGBf[])
     end
