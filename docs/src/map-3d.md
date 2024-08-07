@@ -2,10 +2,12 @@
 
 ````@example map3d
 using Tyler, GLMakie
+using Tyler: ElevationProvider
+
 lat, lon = (47.087441, 13.377214)
 delta = 0.3
 ext = Rect2f(lon-delta/2, lat-delta/2, delta, delta)
-m = Map3D(ext; provider=ElevationProvider())
+m = Tyler.Map3D(ext; provider=ElevationProvider())
 ````
 
 ## Elevation with PlotConfig
@@ -28,7 +30,7 @@ m = Tyler.Map3D(ext; provider=ElevationProvider(nothing), plot_config=cfg)
 lat, lon = (52.40459835, 4.84763329)
 delta = 0.03
 ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
-provider = GeoTilePointCloudProvider()
+provider = Tyler.GeoTilePointCloudProvider()
 Tyler.Map3D(ext; provider=provider)
 ````
 
@@ -39,7 +41,7 @@ Tyler.Map3D(ext; provider=provider)
 lat, lon = (52.40459835, 4.84763329)
 delta = 0.008
 ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
-provider = GeoTilePointCloudProvider()
+provider = Tyler.GeoTilePointCloudProvider()
 image = ElevationProvider(nothing)
 cfg = Tyler.MeshScatterPlotconfig()
 m1 = Tyler.Map3D(ext; provider=provider, plot_config=cfg)
@@ -98,13 +100,8 @@ m = Tyler.Map3D(ext;
 )
 render_rpr(m, "alpine", 10000000)
 ```
-````@example map3d
-# hide
-path = normpath(joinpath(dirname(pathof(Tyler)), "..", "docs", "src", "assets"))
-isdir(path)
-cp(joinpath(path, "alpine.png"), "alpine.png")
-````
-![](pointclouds.png)
+
+![](./assets/alpine.png)
 
 ### PointClouds with RPRMakie
 
@@ -112,7 +109,7 @@ cp(joinpath(path, "alpine.png"), "alpine.png")
 lat, lon = (52.40459835229174, 4.84763329882317)
 delta = 0.005
 ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
-provider = GeoTilePointCloudProvider()
+provider = Tyler.GeoTilePointCloudProvider()
 mat = (type=:Microfacet, roughness=0.2, ior=1.390)
 cfg = Tyler.MeshScatterPlotconfig(material=mat, markersize=4)
 m = Tyler.Map3D(ext; provider=provider, plot_config=cfg, max_plots=3, size=(2000, 2000))
@@ -121,8 +118,5 @@ m2 = Tyler.Map3D(m; provider=ElevationProvider(nothing), plot_config=cfg, max_pl
 render_rpr(m, "pointclouds")
 cp(Tyler)
 ```
-````@example map3d
-# hide
-cp(joinpath(path, "pointclouds.png"), "pointclouds.png")
-````
-![](pointclouds.png)
+
+![](./assets/pointclouds.png)

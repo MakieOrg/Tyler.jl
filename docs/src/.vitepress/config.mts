@@ -5,12 +5,12 @@ import footnote from "markdown-it-footnote";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-    base: "REPLACE_ME_DOCUMENTER_VITEPRESS",
+    base: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
     title: "Tyler",
     description: "Maps",
     lastUpdated: true,
     cleanUrls: true,
-    outDir: "REPLACE_ME_DOCUMENTER_VITEPRESS", // This is required for MarkdownVitepress to work correctly...
+    outDir: 'REPLACE_ME_DOCUMENTER_VITEPRESS', // This is required for MarkdownVitepress to work correctly...
     head: [["link", { rel: "icon", href: "/public/favicon.ico" }]],
 
     markdown: {
