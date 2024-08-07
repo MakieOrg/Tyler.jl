@@ -1,9 +1,6 @@
 
 using GeometryBasics, LinearAlgebra
 
-const SCALE_ADD = Ref(Point3d(540773, 540773, 0))
-const SCALE_DIV = Ref(5000.31)
-
 function setup_axis!(axis::LScene, ext_target)
     # Disconnect all events
     scene = axis.scene
@@ -11,28 +8,15 @@ function setup_axis!(axis::LScene, ext_target)
     Makie.disconnect!(scene.camera)
     # add back our mouse controls
     add_tyler_mouse_controls!(scene, cam)
-
-    X = (ext_target.X )
-    Y = (ext_target.Y )
-    X = (ext_target.X .- SCALE_ADD[][[1, 2]]) ./ SCALE_DIV[]
-    Y = (ext_target.Y .- SCALE_ADD[][[1, 2]]) ./ SCALE_DIV[]
+    X = ext_target.X
+    Y = ext_target.Y
     pmin = Vec3(X[1], Y[1], 0)
     xrange = X[2] - X[1]
     center = Vec3((X[1] + X[2]) / 2, (Y[1] + Y[2]) / 2, 0)
     xaxis = Vec3(xrange / 2, 0, 0)
     eyeposition = pmin .+ xaxis .+ Vec3(0, 0, 0.8 * xrange)
     up = cross(xaxis, center .- eyeposition)
-
     cam.settings.clipping_mode[] = :static
-    cam.controls.fix_x_key[] = true
-    cam.controls.fix_x_key[] = true
-    cam.controls.fix_y_key[] = true
-    cam.settings.circular_rotation[] = (false, false, false)
-    cam.settings.fixed_axis[] = true
-    cam.settings.rotation_center[] = :eyeposition
-    axis.scene.transformation.transform_func[] = Makie.PointTrans{3}() do point
-        return (point .- SCALE_ADD[]) ./ SCALE_DIV[]
-    end
     update_cam!(axis.scene, eyeposition, center, up)
     return
 end
@@ -45,15 +29,11 @@ function Map3D(extent, extent_crs=wgs84;
         fetching_scheme=Tiling3D(),
         args...
     )
-
     return Map(
         extent, extent_crs;
-        resolution=(1000, 1000),
-               figure=figure,
-               axis=axis,
-               provider=provider,
-        crs=MapTiles.web_mercator,
-        cache_size_gb=5,
+        figure=figure,
+        axis=axis,
+        provider=provider,
         fetching_scheme = fetching_scheme,
         args...
     )
@@ -100,6 +80,13 @@ function ray_plane_intersection(position::Point3, normal::Vec3, start::Point3, d
     end
     # Return nothing if there is no intersection
     return nothing
+end
+
+function area_around_lookat(camc::Camera3D, multiplier=2)
+    x, y, _ = camc.lookat[]
+    z = camc.eyeposition[][3]
+    w = multiplier * z
+    return Rect2d(x - w, y - w, 2w, 2w)
 end
 
 function frustrum_plane_intersection(cam::Camera, camc::Camera3D)

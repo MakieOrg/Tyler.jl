@@ -64,10 +64,10 @@ function load_tile_data(provider::GeoTilePointCloudProvider, path::String)
         color = last.(points) # z as fallback
     end
     best_markersize = Dict(
-        "AHN1_T" => 5.0,
-        "AHN2_T" => 2.0,
-        "AHN3_T" => 1.5,
-        "AHN4_T" => 1.0
+        "AHN1_T" => 9.0,
+        "AHN2_T" => 5.0,
+        "AHN3_T" => 4.0,
+        "AHN4_T" => 2.0
     )
     bb = Rect3d(extrema[1], extrema[2] .- extrema[1])
     return PointCloudData(points, color, bb, best_markersize[provider.subset])

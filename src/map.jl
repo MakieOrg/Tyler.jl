@@ -71,9 +71,19 @@ function setup_axis!(axis::Axis, ext_target)
     return
 end
 
+function Map3D(m::Map; kw...)
+    ax = m.axis
+    # Make a copy of the lscene, so we can easier separate the plots.
+    ax2 = LScene(ax.parent, ax.layoutobservables, ax.blockscene)
+    ax2.scene = Scene(ax.scene; camera=ax.scene.camera, camera_controls=ax.scene.camera_controls)
+    return Map3D(nothing, nothing; figure=m.figure, axis=ax2, kw...)
+end
+
+toggle_visibility!(m::Map) = m.axis.scene.visible[] = !m.axis.scene.visible[]
+
 function Map(extent, extent_crs=wgs84;
-    resolution=(1000, 1000),
-    figure=Makie.Figure(; size=resolution),
+    size=(1000, 1000),
+    figure=Makie.Figure(; size=size),
     axis=Makie.Axis(figure[1, 1]; aspect=Makie.DataAspect()),
     plot_config=PlotConfig(),
     provider=TileProviders.OpenStreetMap(:Mapnik),
@@ -82,13 +92,16 @@ function Map(extent, extent_crs=wgs84;
     download_threads=min(1, Threads.nthreads() ÷ 3),
     fetching_scheme=Halo2DTiling(),
     max_zoom=TileProviders.max_zoom(provider),
-    max_plots=400,)
+    max_plots=400)
 
     # Extent
     # if extent input is a HyperRectangle then convert to type Extent
-    extent isa Extent || (extent = Extents.extent(extent))
-    ext_target = MapTiles.project_extent(extent, extent_crs, crs)
-    setup_axis!(axis, ext_target)
+    ext_target = nothing
+    if !isnothing(extent) && !isnothing(extent_crs)
+        extent isa Extent || (extent = Extents.extent(extent))
+        ext_target = MapTiles.project_extent(extent, extent_crs, crs)
+        setup_axis!(axis, ext_target)
+    end
 
     tiles = TileCache(provider; cache_size_gb=cache_size_gb, download_threads=download_threads)
     downloaded_tiles = tiles.downloaded_tiles
@@ -147,7 +160,7 @@ end
 function Base.wait(map::AbstractMap)
     # The download + plot loops need a screen to do their work!
     if isnothing(Makie.getscreen(map.figure.scene))
-        display(map.figure)
+        display(map.figure.scene)
     end
     screen = Makie.getscreen(map.figure.scene)
     isnothing(screen) &&
@@ -187,7 +200,12 @@ Base.showable(::MIME"image/png", ::AbstractMap) = true
 
 function Base.show(io::IO, m::MIME"image/png", map::AbstractMap)
     wait(map)
-    Makie.show(io, m, map.figure)
+    Makie.show(io, m, map.figure.scene)
+end
+
+function Base.display(map::AbstractMap)
+    wait(map)
+    Base.display(map.figure.scene)
 end
 
 

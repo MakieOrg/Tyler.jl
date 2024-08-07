@@ -68,6 +68,11 @@ function remove_plot!(m::Map, key::String)
     push!(m.unused_plots, plot)
 end
 
+get_preprocess(config) = identity
+get_preprocess(config::PlotConfig) = config.preprocess
+get_postprocess(config) = identity
+get_postprocess(config::PlotConfig) = config.postprocess
+
 function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     # For providers which have to map the same data to different tiles
     # Or providers that have e.g. additional parameters like a date
@@ -81,13 +86,14 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     end
 
     cfg = m.plot_config
-    data_processed = cfg.preprocess(data)
+    data_processed = get_preprocess(cfg)(data)
     bounds = get_bounds(tile, data_processed, m.crs)
     if bounds isa Rect3
         # for 3d meshes, we need to remove any plot in the same 2d area
         bounds2d = Rect2d(bounds)
         for (other_key, (plot, other_tile, other_bounds)) in copy(m.plots)
             other_bounds2d = Rect2d(other_bounds)
+            # If overlap
             if bounds2d in other_bounds2d || other_bounds2d in bounds2d
                 if haskey(m.current_tiles, tile)
                     # the new plot has priority since it's in the newest current tile set
@@ -110,7 +116,7 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     end
 
     # Cull unused plots
-    if length(m.plots) > m.max_plots
+    if length(m.plots) >= (m.max_plots - 1)
         # remove the oldest plot
         p_tiles = plotted_tiles(m)
         available_to_remove = setdiff(p_tiles, keys(m.current_tiles))
@@ -126,12 +132,12 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
         end
     end
 
-    if isempty(m.unused_plots)
+    # if isempty(m.unused_plots)
         mplot = create_tileplot!(cfg, m.axis, data_processed, bounds, (tile, m.crs))
-    else
-        mplot = pop!(m.unused_plots)
-        update_tile_plot!(mplot, cfg, m.axis, data_processed, bounds, (tile, m.crs))
-    end
+    # else
+    #     mplot = pop!(m.unused_plots)
+    #     update_tile_plot!(mplot, cfg, m.axis, data_processed, bounds, (tile, m.crs))
+    # end
 
     if haskey(m.current_tiles, tile)
         move_in_front!(mplot, abs(m.zoom[] - tile.z), bounds)
@@ -141,7 +147,7 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
 
     # Always move new plots to the front
     mplot.visible = true
-    cfg.postprocess(mplot)
+    get_postprocess(cfg)(mplot)
     m.plots[key] = (mplot, tile, bounds)
     return
 end
@@ -153,12 +159,14 @@ end
 struct ElevationData
     elevation::AbstractMatrix{<: Number}
     color::AbstractMatrix{<: Colorant}
+    elevation_range::Vec2d
 end
 
 function Base.map(f::Function, data::ElevationData)
     return ElevationData(
         map(f, data.elevation),
-        data.color
+        data.color,
+        data.elevation_range
     )
 end
 
@@ -180,6 +188,7 @@ function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::Elevatio
         color...,
         shading=Makie.NoShading,
         inspectable=false,
+        colorrange=data.elevation_range,
         config.attributes...
     )
     return p
@@ -245,12 +254,11 @@ function Base.map(f::Function, data::PointCloudData)
 end
 
 function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::PointCloudData, ::Rect, tile_crs)
-    msize = ((data.msize) / SCALE_DIV[])
     p = Makie.scatter!(
         axis.scene, data.points;
         color=data.color,
-        marker=Makie.FastPixel(3),
-        markersize=msize,
+        marker=Makie.FastPixel(1),
+        markersize=data.msize,
         markerspace=:data,
         fxaa=false,
         inspectable=false,
@@ -265,6 +273,37 @@ function update_tile_plot!(plot::Makie.Scatter, ::PlotConfig, ::AbstractAxis, da
     plot.markersize = data.msize
     return
 end
+
+struct MeshScatterPlotconfig <: AbstractPlotConfig
+    plcfg::PlotConfig
+end
+MeshScatterPlotconfig(args...; attr...) = MeshScatterPlotconfig(PlotConfig(args...; attr...))
+get_preprocess(config::AbstractPlotConfig) = get_preprocess(config.plcfg)
+get_postprocess(config::AbstractPlotConfig) = get_postprocess(config.plcfg)
+
+function create_tileplot!(config::MeshScatterPlotconfig, axis::AbstractAxis, data::PointCloudData, ::Rect, tile_crs)
+    m = Rect3f(Vec3f(0), Vec3f(1))
+    p = Makie.meshscatter!(
+        axis.scene, data.points;
+        color=data.color,
+        marker=m,
+        markersize=data.msize,
+        inspectable=false,
+        config.plcfg.attributes...
+    )
+    return p
+end
+
+function update_tile_plot!(plot::Makie.MeshScatter, ::MeshScatterPlotconfig, ::AbstractAxis, data::PointCloudData, bounds::Rect, tile_crs)
+    plot.color = data.color
+    println("updating!")
+    plot[1] = data.points
+    @show plot[1][] == data.points
+    plot.markersize = data.msize
+    return
+end
+
+
 
 ############################
 #### Debug tile plotting (image only for now)

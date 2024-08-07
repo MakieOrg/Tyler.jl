@@ -119,9 +119,15 @@ function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camer
     maxdist, _ = findmax(p -> norm(p[3] .- eyepos), points)
     camc.far[] = maxdist * 10
     camc.near[] = eyepos[3] * 0.001
-    points = map(p -> (p .* SCALE_DIV[]) .+ SCALE_ADD[], points)
+    update_cam!(m.axis.scene)
     return tiles_from_poly(m, points), OrderedSet{Tile}()
 end
+
+function get_tiles_for_area(m::Map{LScene}, s::SimpleTiling, (cam, camc)::Tuple{Camera,Camera3D})
+    area = area_around_lookat(camc)
+    return get_tiles_for_area(m, s, area)
+end
+
 
 #########################################################################################
 ##### Helper functions

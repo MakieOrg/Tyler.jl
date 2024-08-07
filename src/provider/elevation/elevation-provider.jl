@@ -35,13 +35,13 @@ function fetch_tile(provider::ElevationProvider, dl::PathDownloader, tile::Tile)
     mini = -450
     maxi = 8700
     elevation_img = collect(reverse(band; dims=2))
-    elevation_img .= Float32.(elevation_img) ./ 8700.0f0 # .* (maxi - mini) .+ mini
+    elevation_img .= Float32.(elevation_img) # .* (maxi - mini) .+ mini
     if isnothing(provider.color_provider)
-        return Tyler.ElevationData(elevation_img, RGBf[])
+        return Tyler.ElevationData(elevation_img, Matrix{RGBf}(undef, 0, 0), Vec2d(mini, maxi))
     end
     foto_img = get!(provider.tile_cache, path) do
         dl = provider.downloader[Threads.threadid()]
         fetch_tile(provider.color_provider, dl, tile)
     end
-    return Tyler.ElevationData(elevation_img, rotr90(foto_img))
+    return Tyler.ElevationData(elevation_img, rotr90(foto_img), Vec2d(mini, maxi))
 end
