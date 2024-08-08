@@ -1,7 +1,7 @@
 
 using GeometryBasics, LinearAlgebra
 
-function setup_axis!(axis::LScene, ext_target)
+function setup_axis!(axis::LScene, ext_target, crs)
     # Disconnect all events
     scene = axis.scene
     cam = scene.camera_controls
@@ -21,6 +21,8 @@ function setup_axis!(axis::LScene, ext_target)
     return
 end
 
+
+
 function Map3D(extent, extent_crs=wgs84;
         size=(1000, 1000),
         figure=Makie.Figure(; size=size),
@@ -39,7 +41,7 @@ function Map3D(extent, extent_crs=wgs84;
     )
 end
 
-function tile_reloader(m::Map{LScene}, area)
+function tile_reloader(m::Map{LScene})
     scene = m.axis.scene
     camc = scene.camera_controls
     update_signal = map((a,b)->nothing, camc.lookat, camc.eyeposition)

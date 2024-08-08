@@ -18,7 +18,7 @@ begin
     lat, lon = (52.395593, 4.884704)
     delta = 0.01
     ext = Rect2f(lon-delta/2, lat-delta/2, delta, delta)
-    m1 = Tyler.Map(ext; download_threads=3)
+    m1 = Tyler.Map(ext; max_parallel_downloads=3)
     display(m1.figure.scene)
 end
 
@@ -26,7 +26,7 @@ begin
     lat, lon = (52.395593, 4.884704)
     delta = 0.01
     ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
-    m1 = Tyler.Map(ext; download_threads=1)
+    m1 = Tyler.Map(ext; max_parallel_downloads=1)
     display(m1.figure.scene)
 end
 

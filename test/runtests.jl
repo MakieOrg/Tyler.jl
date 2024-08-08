@@ -6,7 +6,7 @@ using GeoInterface
 
 # Default
 london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
-m = wait(Tyler.Map(london; scale=1)) # waits until all tiles are displayed
+m = wait(Tyler.Map(london; fetching_schme=Halo2DTiling(scale=1))) # waits until all tiles are displayed
 @test isempty(m.tiles_being_added)
 @test isempty(m.queued_but_not_downloaded)
 @test length(m.displayed_tiles) == 24

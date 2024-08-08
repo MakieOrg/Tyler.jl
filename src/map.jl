@@ -3,13 +3,14 @@ function tile_key(provider::AbstractProvider, tile::Tile)
     return TileProviders.geturl(provider, tile.x, tile.y, tile.z)
 end
 
-"""
-    Map
 
+"""
     Map(extent, [extent_crs=wgs84]; kw...)
+    Map(map::Map; ...) # layering another provider on top of an existing map
 
 Tylers main object, it plots tiles onto a Makie.jl `Axis`,
 downloading and plotting more tiles as you zoom and pan.
+When layering providers over each other with `Map(map::Map; ...)`, you can use `toggle_visibility!(map)` to hide/unhide them.
 
 # Arguments
 
@@ -19,18 +20,18 @@ downloading and plotting more tiles as you zoom and pan.
 
 # Keywords
 
--`resolution`: The figure resolution.
+-`size`: The figure size.
 -`figure`: an existing `Makie.Figure` object.
 -`crs`: The providers coordinate reference system.
 -`provider`: a TileProviders.jl `Provider`.
 -`max_parallel_downloads`: limits the attempted simultaneous downloads, with a default of `16`.
 -`cache_size_gb`: limits the cache for storing tiles, with a default of `5`.
--`depth`: the number of layers to load when zooming. Lower numbers will be slightly faster
-    but have more artefacts. The default is `8`.
--`halo`: The fraction of the width of tiles to add as a halo so that panning is smooth - the
-    tiles will already be loaded. The default is `0.2`, which means `0.1` on each side.
+-`fetching_scheme=Halo2DTiling()`: The tile fetching scheme. Can be SimpleTiling(), Halo2DTiling(), or Tiling3D().
 -`scale`: a tile scaling factor. Low number decrease the downloads but reduce the resolution.
     The default is `1.0`.
+-`plot_config`: A `PlotConfig` object to change the way tiles are plotted.
+-`max_zoom`: The maximum zoom level to display, with a default of `TileProviders.max_zoom(provider)`.
+-`max_plots=400:` The maximum number of plots to keep displayed at the same time.
 """
 struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     provider::AbstractProvider
@@ -56,9 +57,9 @@ struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     max_plots::Int
 end
 
-setup_axis!(::Makie.AbstractAxis, ext_target) = nothing
+setup_axis!(::Makie.AbstractAxis, ext_target, crs) = nothing
 
-function setup_axis!(axis::Axis, ext_target)
+function setup_axis!(axis::Axis, ext_target, crs)
     X = ext_target.X
     Y = ext_target.Y
     axis.autolimitaspect = 1
@@ -79,6 +80,34 @@ function Map3D(m::Map; kw...)
     return Map3D(nothing, nothing; figure=m.figure, axis=ax2, kw...)
 end
 
+
+"""
+    Map(m::Map; kw...)
+Layering constructor to show another provider on top of an existing map.
+
+## Example
+```julia
+lat, lon = (52.395593, 4.884704)
+delta = 0.01
+ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
+m1 = Tyler.Map(ext)
+m2 = Tyler.Map(m1; provider=TileProviders.Esri(:WorldImagery), plot_config=Tyler.PlotConfig(alpha=0.5, postprocess=(p-> translate!(p, 0, 0, 1f0))))
+m1
+```
+"""
+function Map(m::Map; kw...)
+    ax = m.axis
+    # Make a copy of the lscene, so we can easier separate the plots.
+    ax2 = Axis(ax.parent, ax.layoutobservables, ax.blockscene)
+    ax2.scene = Scene(ax.scene; camera=ax.scene.camera, camera_controls=ax.scene.camera_controls)
+    setfield!(ax2, :elements, ax.elements)
+    setfield!(ax2, :targetlimits, ax.targetlimits)
+    setfield!(ax2, :finallimits, ax.finallimits)
+    setfield!(ax2, :block_limit_linking, ax.block_limit_linking)
+    setfield!(ax2.scene, :float32convert, ax.scene.float32convert)
+    return Map(nothing, nothing; figure=m.figure, axis=ax2, kw...)
+end
+
 toggle_visibility!(m::Map) = m.axis.scene.visible[] = !m.axis.scene.visible[]
 
 function Map(extent, extent_crs=wgs84;
@@ -89,7 +118,7 @@ function Map(extent, extent_crs=wgs84;
     provider=TileProviders.OpenStreetMap(:Mapnik),
     crs=MapTiles.web_mercator,
     cache_size_gb=5,
-    download_threads=min(1, Threads.nthreads() ÷ 3),
+    max_parallel_downloads=min(1, Threads.nthreads(:default) ÷ 3),
     fetching_scheme=Halo2DTiling(),
     max_zoom=TileProviders.max_zoom(provider),
     max_plots=400)
@@ -100,10 +129,10 @@ function Map(extent, extent_crs=wgs84;
     if !isnothing(extent) && !isnothing(extent_crs)
         extent isa Extent || (extent = Extents.extent(extent))
         ext_target = MapTiles.project_extent(extent, extent_crs, crs)
-        setup_axis!(axis, ext_target)
+        setup_axis!(axis, ext_target, crs)
     end
 
-    tiles = TileCache(provider; cache_size_gb=cache_size_gb, download_threads=download_threads)
+    tiles = TileCache(provider; cache_size_gb=cache_size_gb, max_parallel_downloads=max_parallel_downloads)
     downloaded_tiles = tiles.downloaded_tiles
 
     plots = ThreadSafeDict{String,Tuple{Makie.Plot,Tile,Rect}}()
@@ -144,7 +173,7 @@ function Map(extent, extent_crs=wgs84;
         end
     end
 
-    tile_reloader(map, ext_target)
+    tile_reloader(map)
 
     on(axis.scene.events.window_open) do open
         if !open && !closed[]
@@ -168,11 +197,10 @@ function Base.wait(map::AbstractMap)
     return wait(map.tiles)
 end
 
-function tile_reloader(map::Map{Axis}, first_area)
+function tile_reloader(map::Map{Axis})
     axis = map.axis
-    update_tiles!(map, first_area)
     throttled = Makie.Observables.throttle(0.2, axis.finallimits)
-    on(axis.scene, throttled) do extent
+    on(axis.scene, throttled; update=true) do extent
         update_tiles!(map, extent)
         return
     end

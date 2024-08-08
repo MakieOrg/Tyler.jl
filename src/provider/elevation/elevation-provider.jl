@@ -1,4 +1,12 @@
+"""
+    ElevationProvider(color_provider::Union{Nothing, AbstractProvider}=TileProviders.Esri(:WorldImagery); cache_size_gb=5)
 
+Provider rendering elevation data from [arcgis](https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer).
+This provider is special, since it uses a second provider for color information,
+which also means you can provide a cache size, since color tile caching has to be managed by the provider.
+When set to `nothing`, no color provider is used and the elevation data is used to color the surface with a colormap directly.
+Use `Map(..., plot_config=Tyler.PlotConfig(colormap=colormap))` to set the colormap and other `surface` plot attributes.
+"""
 struct ElevationProvider <: AbstractProvider
     color_provider::Union{Nothing, AbstractProvider}
     tile_cache::LRU{String}
@@ -16,7 +24,7 @@ function ElevationProvider(provider=TileProviders.Esri(:WorldImagery); cache_siz
     downloader = [get_downloader(provider) for i in 1:Threads.nthreads()]
     ElevationProvider(provider, fetched_tiles, downloader)
 end
-# https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer
+
 function TileProviders.geturl(::ElevationProvider, x::Integer, y::Integer, z::Integer)
     return "https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer/tile/$(z)/$(y)/$(x)"
 end

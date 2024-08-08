@@ -28,14 +28,14 @@ function take_last!(c::Channel)
     end
 end
 
-function TileCache(provider; cache_size_gb=5, download_threads=min(1, Threads.nthreads() ÷ 3))
+function TileCache(provider; cache_size_gb=5, max_parallel_downloads=min(1, Threads.nthreads() ÷ 3))
     TileFormat = get_tile_format(provider)
-    downloader = [get_downloader(provider) for i in 1:download_threads]
+    downloader = [get_downloader(provider) for i in 1:max_parallel_downloads]
     fetched_tiles = LRU{String,TileFormat}(; maxsize=cache_size_gb * 10^9, by=Base.summarysize)
     downloaded_tiles = Channel{Tuple{Tile,Union{Nothing, TileFormat}}}(Inf)
 
     tile_queue = Channel{Tile}(Inf)
-    for thread in 1:download_threads
+    for thread in 1:max_parallel_downloads
         Threads.@spawn begin
             dl = downloader[thread]
             while isopen(tile_queue) || isready(tile_queue)
@@ -58,6 +58,7 @@ function TileCache(provider; cache_size_gb=5, download_threads=min(1, Threads.nt
                     nothing
                 end
                 put!(downloaded_tiles, (tile, result))
+                yield()
             end
         end
     end
