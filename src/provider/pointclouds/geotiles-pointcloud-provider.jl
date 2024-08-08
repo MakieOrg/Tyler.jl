@@ -1,5 +1,14 @@
 
+"""
+    GeoTilePointCloudProvider(subset="AHN1_T")
 
+The PointCloud provider downloads from [geotiles.citg.tudelft](https://geotiles.citg.tudelft.nl), which spans most of the netherlands.
+You can specify the subset to download from, which can be one of the following:
+- AHN1_T (default): The most corse dataset, but also the fastest to download (1-5mb compressed per tile)
+- AHN2_T: More detailed dataset (~70mb per tile)
+- AHN3_T: ~250mb per tile
+- AHN4_T: 300-500mb showing much detail, takes a long time to load each tile (over 1 minute per tile). Use `max_plots=5` to limit the number of tiles loaded at once.
+"""
 struct GeoTilePointCloudProvider <: TileProviders.AbstractProvider
     baseurl::String
     subset::String

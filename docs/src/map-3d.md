@@ -1,5 +1,7 @@
 # Map3D
 
+Tyler also offers to view tiles in 3D, and offers a simple Elevation and PointCloud provider.
+
 ````@example map3d
 using Tyler, GLMakie
 using Tyler: ElevationProvider
@@ -8,10 +10,13 @@ lat, lon = (47.087441, 13.377214)
 delta = 0.3
 ext = Rect2f(lon-delta/2, lat-delta/2, delta, delta)
 m = Tyler.Map3D(ext; provider=ElevationProvider())
-
 ````
 
 ## Elevation with PlotConfig
+
+With PlotConfig one can change the way tiles are plotted.
+The it has a preprocess + postprocess function and allows to pass any plot attribute to the tile.
+These attributes are global and will be passed to every tile plot.
 
 ````@example map3d
 lat, lon = (47.087441, 13.377214)
@@ -25,7 +30,9 @@ cfg = Tyler.PlotConfig(
 m = Tyler.Map3D(ext; provider=ElevationProvider(nothing), plot_config=cfg)
 ````
 
-## PointClouds + FastPixel + scatter
+## PointClouds
+
+The PointCloud provider downloads from [geotiles.citg.tudelft](https://geotiles.citg.tudelft.nl), which spans most of the netherlands.
 
 ````@example map3d
 lat, lon = (52.40459835, 4.84763329)
@@ -37,6 +44,9 @@ m = Tyler.Map3D(ext; provider=provider)
 
 
 ## Pointclouds with PlotConfig + Meshscatter
+
+There is also a MeshScatter plot config, which can be used to switch the point cloud plotting from scatter to meshscatter.
+This looks better, at a significant slow down.
 
 ````@example map3d
 lat, lon = (52.40459835, 4.84763329)
