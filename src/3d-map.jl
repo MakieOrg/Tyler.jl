@@ -34,7 +34,7 @@ function Map3D(extent, extent_crs=wgs84;
         figure=figure,
         axis=axis,
         provider=provider,
-        fetching_scheme = fetching_scheme,
+        fetching_scheme=fetching_scheme,
         args...
     )
 end
@@ -131,7 +131,8 @@ function optimal_zoom(crs, diagonal, diagonal_resolution, zoom_range, old_zoom)
     candidates = @NamedTuple{z::Int, ntiles::Float64}[]
     for z in zoom_range
         ext = Extents.extent(Tile(0, 0, z), crs)
-        diag = norm(Point2f(ext.X[2], ext.Y[2]) .- Point2f(ext.X[1], ext.Y[1]))
+        mini, maxi = Point2.(ext.X, ext.Y)
+        diag = norm(maxi .- mini)
         ntiles = diagonal / diag
         canditates_dict[z] = ntiles
         push!(candidates, (; z, ntiles))

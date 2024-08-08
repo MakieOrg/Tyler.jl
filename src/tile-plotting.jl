@@ -257,7 +257,7 @@ function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::PointClo
     p = Makie.scatter!(
         axis.scene, data.points;
         color=data.color,
-        marker=Makie.FastPixel(1),
+        marker=Makie.FastPixel(),
         markersize=data.msize,
         markerspace=:data,
         fxaa=false,
@@ -296,9 +296,7 @@ end
 
 function update_tile_plot!(plot::Makie.MeshScatter, ::MeshScatterPlotconfig, ::AbstractAxis, data::PointCloudData, bounds::Rect, tile_crs)
     plot.color = data.color
-    println("updating!")
     plot[1] = data.points
-    @show plot[1][] == data.points
     plot.markersize = data.msize
     return
 end

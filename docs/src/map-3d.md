@@ -8,6 +8,7 @@ lat, lon = (47.087441, 13.377214)
 delta = 0.3
 ext = Rect2f(lon-delta/2, lat-delta/2, delta, delta)
 m = Tyler.Map3D(ext; provider=ElevationProvider())
+
 ````
 
 ## Elevation with PlotConfig
@@ -31,7 +32,7 @@ lat, lon = (52.40459835, 4.84763329)
 delta = 0.03
 ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
 provider = Tyler.GeoTilePointCloudProvider()
-Tyler.Map3D(ext; provider=provider)
+m = Tyler.Map3D(ext; provider=provider)
 ````
 
 
