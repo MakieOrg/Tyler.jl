@@ -23,11 +23,24 @@ TileProviders.max_zoom(::GeoTilePointCloudProvider) = 16
 
 const AHN_SUB_MAPPING = Dict{Tuple{Int,Int},String}()
 
+function read_mapping(path)
+    open(path, "r") do io
+        n = read(io, Int)
+        keys = Matrix{UInt16}(undef, n, 2)
+        read!(io, keys)
+        strings = Vector{String}(undef, n)
+        for i in 1:n
+            strings[i] = readuntil(io, Char(0))
+        end
+        return Dict(Tuple(Int.(keys[i, :])) => strings[i] for i in 1:n)
+    end
+end
+
 function get_ahn_sub_mapping()
     if isempty(AHN_SUB_MAPPING)
-        path = joinpath(@__DIR__, "mapping.csv")
-        matrix = DelimitedFiles.readdlm(path, ',')
-        merge!(AHN_SUB_MAPPING, Dict((r[1], r[2]) => r[3] for r in eachrow(matrix)))
+        path = joinpath(@__DIR__, "mapping.bin")
+        dict = read_mapping(path)
+        merge!(AHN_SUB_MAPPING, dict)
     end
     return AHN_SUB_MAPPING
 end

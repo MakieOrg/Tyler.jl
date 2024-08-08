@@ -61,10 +61,28 @@ mkeys = collect(keys(mapping))
 mvalues = collect(values(mapping))
 k1 = first.(mkeys)
 k2 = last.(mkeys)
-matrix = hcat(k1, k2, mvalues)
+matrix = hcat(k1, k2)
 
-DelimitedFiles.writedlm("mapping.csv", matrix, ',')
+open(joinpath(@__DIR__, "mapping.bin"), "w") do io
+    write(io, length(mkeys))
+    write(io, UInt16.(matrix))
+    for s in mkeys
+        write(io, s)
+        write(io, UInt8(0))
+    end
+end
 
-matrix = DelimitedFiles.readdlm("mapping.csv", ',')
-mapping2 = Dict((r[1], r[2]) => r[3] for r in eachrow(matrix))
-@assert mapping2 == mapping
+function read_mapping(path)
+    open(path, "r") do io
+        n = read(io, Int)
+        keys = Matrix{UInt16}(undef, n, 2)
+        read!(io, keys)
+        strings = Vector{String}(undef, n)
+        for i in 1:n
+            strings[i] = readuntil(io, Char(0))
+        end
+        return Dict(Tuple(Int.(keys[i, :])) => strings[i] for i in 1:n)
+    end
+end
+
+read_mapping(joinpath(@__DIR__, "mapping.bin"))
