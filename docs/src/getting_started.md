@@ -76,14 +76,17 @@ Although, the figure size can be controlled by passing additional arguments to `
 using GLMakie, Tyler
 using Tyler.TileProviders
 
-provider = TileProviders.OpenStreetMap(:Mapnik)
+provider = TileProviders.OpenTopoMap()
 london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
 
 with_theme(theme_dark()) do
-    m = Tyler.Map(london; provider, size =(1200,600))
-    hidedecorations!(m.axis)
-    hidespines!(m.axis)
-    m
+    fig = Figure(; size =(1200,600))
+    ax = Axis(fig[1,1]) # aspect = DataAspect()
+    m = Tyler.Map(london; provider, figure=fig, axis=ax)
+    wait(m)
+    hidedecorations!(ax)
+    hidespines!(ax)
+    fig
 end
 ````
 
