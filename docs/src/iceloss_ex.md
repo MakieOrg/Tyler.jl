@@ -70,21 +70,14 @@ show map
 fig = Figure(; size = (1200,600))
 ax = Axis(fig[1,1])
 m = Tyler.Map(extent; provider, figure=fig, axis=ax)
-wait(m)
-save("ice_loss1.png", m.figure) # hide
-nothing # hide
 ````
-
-![](ice_loss1.png)
 
 create initial scatter plot
 
 ````@example ice
 scatter!(ax, X, Y; color = Z, colormap = cmap, colorrange = [0, n], markersize = 10);
-save("ice_loss2.png", m.figure) # hide
-nothing # hide
+m
 ````
-![](ice_loss2.png)
 
 add colorbar
 
@@ -98,12 +91,8 @@ Colorbar(fig[1,2]; colormap = cmap, colorrange = [a,b],
 hidedecorations!(ax);
 # hide frames
 hidespines!(ax);
-# wait for tiles to fully load
-wait(m)
-save("ice_loss3.png", m.figure) # hide
-nothing # hide
+m
 ````
-![](ice_loss3.png)
 
 loop to create animation
 ````julia

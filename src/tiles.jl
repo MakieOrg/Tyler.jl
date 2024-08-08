@@ -28,38 +28,48 @@ function take_last!(c::Channel)
     end
 end
 
+function run_loop(thread_id, tile_queue, fetched_tiles, downloader, provider, downloaded_tiles)
+    dl = downloader[thread_id]
+    while isopen(tile_queue) || isready(tile_queue)
+        tile = take_last!(tile_queue) # priorize newly arrived tiles
+        result = nothing
+        try
+            @debug("downloading tile on thread $(Threads.threadid())")
+            # For providers which have to map the same data to different tiles
+            # Or providers that have e.g. additional paramers like date
+            # the url is a much better key than the tile itself
+            key = tile_key(provider, tile)
+            # if the provider knows it doesn't have a tile, it can return nothing
+            isnothing(key) && continue
+            result = get!(fetched_tiles, key) do
+                fetch_tile(provider, dl, tile)
+            end
+        catch e
+            @warn "Error while fetching tile on thread $(Threads.threadid())" exception = (e, catch_backtrace())
+            # put!(tile_queue, tile)  # retry (not implemented, should have a max retry count and some error handling)
+            nothing
+        end
+        put!(downloaded_tiles, (tile, result))
+        yield()
+    end
+end
+
 function TileCache(provider; cache_size_gb=5, max_parallel_downloads=min(1, Threads.nthreads() ÷ 3))
     TileFormat = get_tile_format(provider)
     downloader = [get_downloader(provider) for i in 1:max_parallel_downloads]
     fetched_tiles = LRU{String,TileFormat}(; maxsize=cache_size_gb * 10^9, by=Base.summarysize)
     downloaded_tiles = Channel{Tuple{Tile,Union{Nothing, TileFormat}}}(Inf)
-
     tile_queue = Channel{Tile}(Inf)
+    async = Threads.nthreads() <= 1
+    if async && max_parallel_downloads > 1
+        @warn "Multiple download threads are not supported with Threads.nthreads()==1, falling back to async. Start Julia with more threads for parallel downloads."
+        async = true
+    end
     for thread in 1:max_parallel_downloads
-        Threads.@spawn begin
-            dl = downloader[thread]
-            while isopen(tile_queue) || isready(tile_queue)
-                tile = take_last!(tile_queue) # priorize newly arrived tiles
-                result = nothing
-                try
-                    @debug("downloading tile on thread $(Threads.threadid())")
-                    # For providers which have to map the same data to different tiles
-                    # Or providers that have e.g. additional paramers like date
-                    # the url is a much better key than the tile itself
-                    key = tile_key(provider, tile)
-                    # if the provider knows it doesn't have a tile, it can return nothing
-                    isnothing(key) && continue
-                    result = get!(fetched_tiles, key) do
-                        fetch_tile(provider, dl, tile)
-                    end
-                catch e
-                    @warn "Error while fetching tile on thread $(Threads.threadid())" exception = (e, catch_backtrace())
-                    # put!(tile_queue, tile)  # retry (not implemented, should have a max retry count and some error handling)
-                    nothing
-                end
-                put!(downloaded_tiles, (tile, result))
-                yield()
-            end
+        if async
+            @async run_loop(thread, tile_queue, fetched_tiles, downloader, provider, downloaded_tiles)
+        else
+            Threads.@spawn run_loop(thread, tile_queue, fetched_tiles, downloader, provider, downloaded_tiles)
         end
     end
     return TileCache{TileFormat,eltype(downloader)}(provider, fetched_tiles, tile_queue, downloaded_tiles, downloader)

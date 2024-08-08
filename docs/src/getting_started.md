@@ -13,7 +13,7 @@ In the Julia REPL type:
 ```
 The `]` character starts the Julia [package manager](https://docs.julialang.org/en/v1/stdlib/Pkg/). Hit backspace key to return to Julia prompt.
 
-Or, explicitly use `Pkg` 
+Or, explicitly use `Pkg`
 
 ```julia
 using Pkg
@@ -25,12 +25,8 @@ Pkg.add(["Tyler.jl"])
 ````@example london
 using Tyler, GLMakie
 m = Tyler.Map(Rect2f(-0.0921, 51.5, 0.04, 0.025))
-wait(m)
-save("london.png", current_figure()) # hide
-nothing # hide
 ````
 
-![](london.png)
 
 ::: info
 
@@ -46,20 +42,16 @@ We can use a different tile provider as well as any style `theme` from Makie as 
 using GLMakie, Tyler
 using Tyler.TileProviders
 
-provider = TileProviders.OpenTopoMap()
+provider = TileProviders.OpenStreetMap(:Mapnik)
 london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
 
 with_theme(theme_dark()) do
     m = Tyler.Map(london; provider)
     hidedecorations!(m.axis)
     hidespines!(m.axis)
-    wait(m)
+    m
 end
-save("londonProvider.png", current_figure()) # hide
-nothing # hide
 ````
-
-![](londonProvider.png)
 
 ## Providers list
 
@@ -84,22 +76,15 @@ Although, the figure size can be controlled by passing additional arguments to `
 using GLMakie, Tyler
 using Tyler.TileProviders
 
-provider = TileProviders.OpenTopoMap()
+provider = TileProviders.OpenStreetMap(:Mapnik)
 london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
 
 with_theme(theme_dark()) do
-    fig = Figure(; size =(1200,600))
-    ax = Axis(fig[1,1]) # aspect = DataAspect()
-    m = Tyler.Map(london; provider, figure=fig, axis=ax)
-    hidedecorations!(ax)
-    hidespines!(ax)
-    wait(m)
-    fig
+    m = Tyler.Map(london; provider, size =(1200,600))
+    hidedecorations!(m.axis)
+    hidespines!(m.axis)
+    m
 end
-save("londonFigure.png", current_figure()) # hide
-nothing # hide
 ````
-
-![](londonFigure.png)
 
 Next, we could add any other plot type on top of the `ax` axis defined above.

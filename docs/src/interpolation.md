@@ -32,8 +32,6 @@ p2 = Tyler.Interpolator(fun; options)
 
 b = Rect2f(-20.0, -20.0, 40.0, 40.0)
 m = Tyler.Map(b, provider=p1)
-wait(m)
-nothing # hide
 ````
 
 ::: tip
