@@ -74,7 +74,7 @@ end
 function load_tile_data(::AbstractProvider, downloaded::AbstractVector{UInt8})
     io = IOBuffer(downloaded)
     format = FileIO.query(io)  # this interrogates the magic bits to see what file format it is (JPEG, PNG, etc)
-    return FileIO.load(format)
+    return FileIO.load(format) # this works because we have ImageIO loaded
 end
 
 function Base.wait(tiles::TileCache)
