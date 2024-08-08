@@ -55,7 +55,7 @@ function get_tiles_for_area(m::Map{Axis}, scheme::Halo2DTiling, area::Union{Rect
     depth = scheme.depth
 
     # Calculate the zoom level
-    zoom = calculate_optimal_zoom(m, area)
+    zoom = optimal_zoom(m, norm(widths(to_rect(area))))
     m.zoom[] = zoom
 
     # And the z layers we will plot
@@ -137,26 +137,44 @@ function get_resolution(map::Map)
     return isnothing(screen) ? size(map.axis.scene) .* 1.5 : size(screen)
 end
 
-function calculate_optimal_zoom(map::Map, area)
-    screen = Makie.getscreen(map.axis.scene)
-    res = isnothing(screen) ? size(map.axis.scene) : size(screen)
-    return clamp(z_index(area, res, map.crs), min_zoom(map), max_zoom(map))
-end
-
-function z_index(extent::Union{Rect,Extent}, res::Tuple, crs)
-    # Calculate the number of tiles at each z and get the one
-    # closest to the resolution `res`
-    target_ntiles = prod(map(r -> r / 256, res))
-    tiles_at_z = map(1:24) do z
-        length(TileGrid(extent, z, crs))
-    end
-    return findmin(x -> abs(x - target_ntiles), tiles_at_z)[2]
-end
-
 function grow_extent(area::Union{Rect,Extent}, factor)
     Extent(map(Extents.bounds(area)) do axis_bounds
         span = axis_bounds[2] - axis_bounds[1]
         pad = factor * span / 2
         return (axis_bounds[1] - pad, axis_bounds[2] + pad)
     end)
+end
+
+function optimal_zoom(m::Map, diagonal)
+    diagonal_res = norm(get_resolution(m)) * m.scale
+    zoomrange = min_zoom(m):max_zoom(m)
+    optimal_zoom(m.crs, diagonal, diagonal_res, zoomrange, m.zoom[])
+end
+
+function optimal_zoom(crs, diagonal, diagonal_resolution, zoom_range, old_zoom)
+    # Some provider only support one zoom level
+    length(zoom_range) == 1 && return zoom_range[1]
+    # TODO, this should come from provider
+    tile_diag_res = norm((255, 255))
+    target_ntiles = diagonal_resolution / tile_diag_res
+    canditates_dict = Dict{Int,Float64}()
+    candidates = @NamedTuple{z::Int, ntiles::Float64}[]
+    for z in zoom_range
+        ext = Extents.extent(Tile(0, 0, z), crs)
+        mini, maxi = Point2.(ext.X, ext.Y)
+        diag = norm(maxi .- mini)
+        ntiles = diagonal / diag
+        canditates_dict[z] = ntiles
+        push!(candidates, (; z, ntiles))
+    end
+    if haskey(canditates_dict, old_zoom) # for the first invokation, old_zoom is 0, which is not a candidate
+        old_ntiles = canditates_dict[old_zoom]
+        # If the old zoom level is close to the target number of tiles, return it
+        # to change the zoom level less often
+        if old_ntiles > (target_ntiles - 1) && old_ntiles < (target_ntiles + 1)
+            return old_zoom
+        end
+    end
+    dist, idx = findmin(x -> abs(x.ntiles - target_ntiles), candidates)
+    return candidates[idx].z
 end

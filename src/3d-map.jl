@@ -112,45 +112,9 @@ function frustrum_plane_intersection(cam::Camera, camc::Camera3D)
     end
 end
 
-
 function to_rect(extent::Extent)
-    return Rect2f(extent.X[1], extent.Y[1], extent.X[2] - extent.X[1], extent.Y[2] - extent.Y[1])
+    return Rect2(extent.X[1], extent.Y[1], extent.X[2] - extent.X[1], extent.Y[2] - extent.Y[1])
 end
-
-function optimal_zoom(m::Map, diagonal)
-    diagonal_res = norm(get_resolution(m)) * 0.7
-    zoomrange = min_zoom(m):max_zoom(m)
-    optimal_zoom(m.crs, diagonal, diagonal_res, zoomrange, m.zoom[])
-end
-
-function optimal_zoom(crs, diagonal, diagonal_resolution, zoom_range, old_zoom)
-    # Some provider only support one zoom level
-    length(zoom_range) == 1 && return zoom_range[1]
-    # TODO, this should come from provider
-    tile_diag_res = norm((255,255))
-    target_ntiles = diagonal_resolution / tile_diag_res
-    canditates_dict = Dict{Int, Float64}()
-    candidates = @NamedTuple{z::Int, ntiles::Float64}[]
-    for z in zoom_range
-        ext = Extents.extent(Tile(0, 0, z), crs)
-        mini, maxi = Point2.(ext.X, ext.Y)
-        diag = norm(maxi .- mini)
-        ntiles = diagonal / diag
-        canditates_dict[z] = ntiles
-        push!(candidates, (; z, ntiles))
-    end
-    if haskey(canditates_dict, old_zoom) # for the first invokation, old_zoom is 0, which is not a candidate
-        old_ntiles = canditates_dict[old_zoom]
-        # If the old zoom level is close to the target number of tiles, return it
-        # to change the zoom level less often
-        if old_ntiles > (target_ntiles - 1) && old_ntiles < (target_ntiles + 1)
-            return old_zoom
-        end
-    end
-    dist, idx = findmin(x -> abs(x.ntiles - target_ntiles), candidates)
-    return candidates[idx].z
-end
-
 
 function tiles_from_poly(m::Map, points)
     mini = minimum(points)

@@ -18,6 +18,9 @@ end
 Interpolator(f; colormap=:thermal, options=Dict(:minzoom=>1, :maxzoom=>19)) =
     Interpolator(f, Makie.to_colormap(colormap), options)
 
+function TileProviders.geturl(::Interpolator, x::Integer, y::Integer, z::Integer)
+    return "$x,$y,$z"
+end
 
 get_downloader(::Interpolator) = NoDownload()
 

@@ -28,7 +28,7 @@ When layering providers over each other with `Map(map::Map; ...)`, you can use `
 -`cache_size_gb`: limits the cache for storing tiles, with a default of `5`.
 -`fetching_scheme=Halo2DTiling()`: The tile fetching scheme. Can be SimpleTiling(), Halo2DTiling(), or Tiling3D().
 -`scale`: a tile scaling factor. Low number decrease the downloads but reduce the resolution.
-    The default is `1.0`.
+    The default is `0.5`.
 -`plot_config`: A `PlotConfig` object to change the way tiles are plotted.
 -`max_zoom`: The maximum zoom level to display, with a default of `TileProviders.max_zoom(provider)`.
 -`max_plots=400:` The maximum number of plots to keep displayed at the same time.
@@ -55,6 +55,7 @@ struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     fetching_scheme::FetchingScheme
     max_zoom::Int
     max_plots::Int
+    scale::Float64
 end
 
 setup_axis!(::Makie.AbstractAxis, ext_target, crs) = nothing
@@ -121,7 +122,8 @@ function Map(extent, extent_crs=wgs84;
     max_parallel_downloads=min(1, Threads.nthreads(:default) ÷ 3),
     fetching_scheme=Halo2DTiling(),
     max_zoom=TileProviders.max_zoom(provider),
-    max_plots=400)
+    max_plots=400,
+    scale=0.5)
 
     # Extent
     # if extent input is a HyperRectangle then convert to type Extent
@@ -152,7 +154,7 @@ function Map(extent, extent_crs=wgs84;
         should_be_plotted,
         display_task, crs,
         Observable(1),
-        fetching_scheme, max_zoom, max_plots
+        fetching_scheme, max_zoom, max_plots, Float64(scale)
     )
 
     map.zoom[] = 0
@@ -194,7 +196,8 @@ function Base.wait(map::AbstractMap)
     screen = Makie.getscreen(map.figure.scene)
     isnothing(screen) &&
         error("No screen after display. Wrong backend? Only WGLMakie and GLMakie are supported.")
-    return wait(map.tiles)
+    wait(map.tiles)
+    return map
 end
 
 function tile_reloader(map::Map{Axis})
