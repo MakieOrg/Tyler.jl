@@ -1,4 +1,4 @@
-## OpenStreetMap data (OSM) 
+## OpenStreetMap data (OSM)
 
 In this example, we combine OpenStreetMap data, loading some roads and buildings and plotting them on top of a Tyler map.
 
@@ -38,6 +38,5 @@ m = Tyler.Map(london; provider=provider, crs=Tyler.wgs84)
 m.axis.aspect = map_aspect(area.minlat, area.maxlat)
 p = osmplot!(m.axis, osm; buildings)
 # DataInspector(m.axis) # this is broken/slow
-wait(m)
-
+m
 ````

@@ -69,22 +69,15 @@ show map
 ````@example ice
 fig = Figure(; size = (1200,600))
 ax = Axis(fig[1,1])
-m = Tyler.Map(extent; provider, figure=fig, axis=ax);
-wait(m)
-save("ice_loss1.png", current_figure()) # hide
-nothing # hide
+m = Tyler.Map(extent; provider, figure=fig, axis=ax)
 ````
-
-![](ice_loss1.png)
 
 create initial scatter plot
 
 ````@example ice
 scatter!(ax, X, Y; color = Z, colormap = cmap, colorrange = [0, n], markersize = 10);
-save("ice_loss2.png", current_figure()) # hide
-nothing # hide
+m
 ````
-![](ice_loss2.png)
 
 add colorbar
 
@@ -98,26 +91,22 @@ Colorbar(fig[1,2]; colormap = cmap, colorrange = [a,b],
 hidedecorations!(ax);
 # hide frames
 hidespines!(ax);
-# wait for tiles to fully load
-wait(m)
-save("ice_loss3.png", current_figure()) # hide
-nothing # hide
+m
 ````
-![](ice_loss3.png)
 
-loop to create animation 
+loop to create animation
 ````julia
-for k = 1:15 
+for k = 1:15
     # reset apha
     alpha[:] = zeros(nc);
     cmap[] = Colors.alphacolor.(cmap[], alpha)
-    for i in 2:1:n 
+    for i in 2:1:n
         # modify alpha
         alpha[1:maximum([1,round(Int64,i*nc/n)])] = alpha[1:maximum([1,round(Int64,i*nc/n)])] .* (1.05^-1.5);
         alpha[maximum([1,round(Int64,i*nc/n)])] = 1;
         cmap[] = Colors.alphacolor.(cmap[], alpha);
         sleep(0.001);
-    end 
+    end
 end
 ````
 

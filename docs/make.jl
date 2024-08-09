@@ -2,8 +2,6 @@ using Documenter, DocumenterVitepress
 using Tyler
 using Logging
 
-Logging.disable_logging(Logging.Warn)
-
 makedocs(;
     sitename="Tyler",
     modules=[Tyler],
@@ -17,13 +15,10 @@ makedocs(;
         devurl="dev";
     ),
     draft=false,
-    source="src", 
-    build="build", 
+    source="src",
+    build="build",
     warnonly=true,
 )
-
-# Enable logging to console again
-Logging.disable_logging(Logging.BelowMinLevel)
 
 deploydocs(;
     repo="github.com/MakieOrg/Tyler.jl.git",

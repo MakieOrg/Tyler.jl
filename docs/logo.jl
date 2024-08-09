@@ -9,7 +9,7 @@ mars = Provider("https://api.nasa.gov/mars-wmts/catalog/Mars_Viking_MDIM21_ClrMo
 moon =  Provider("https://trek.nasa.gov/tiles/Moon/EQ/LRO_WAC_Mosaic_Global_303ppd_v02/1.0.0/default/default028mm/{z}/{y}/{x}.jpg")
 
 mexico = Rect2f(-99.20618766110033, 19.425887652841997, 0.03, 0.02)
-provider = TileProviders.OpenTopoMap()
+provider = TileProviders.OpenStreetMap(:Mapnik)
 
 fig1 = Figure(; figure_padding=0, size= (600,600))
 ax1 = Axis(fig1[1,1]; ygridcolor=:silver, xgridcolor=:white,
@@ -31,7 +31,7 @@ hidespines!(ax1)
 img_berlin = copy(Makie.colorbuffer(fig2))
 
 london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
-provider = TileProviders.OpenTopoMap()
+provider = TileProviders.OpenStreetMap(:Mapnik)
 fig3 = Figure(; figure_padding=0, size= (600,600))
 ax1 = Axis(fig3[1,1]; ygridcolor=:silver, xgridcolor=:white,
      xgridwidth=2, ygridwidth=2)
