@@ -102,4 +102,6 @@ nothing # hide
 
 ![](londonFigure.png)
 
+Note that here the `domain` gets expanded around the defined `london` region.
+
 Next, we could add any other plot type on top of the `ax` axis defined above.
