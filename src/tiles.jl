@@ -10,7 +10,6 @@ get_tile_format(provider) = Matrix{RGB{N0f8}}
 
 get_downloader(provider) = ByteDownloader()
 
-
 function take_last!(c::Channel)
     lock(c)
     try
@@ -27,6 +26,7 @@ function take_last!(c::Channel)
         unlock(c)
     end
 end
+
 
 function run_loop(thread_id, tile_queue, fetched_tiles, downloader, provider, downloaded_tiles)
     dl = downloader[thread_id]
@@ -88,9 +88,21 @@ function load_tile_data(::AbstractProvider, downloaded::AbstractVector{UInt8})
     return FileIO.load(format) # this works because we have ImageIO loaded
 end
 
-function Base.wait(tiles::TileCache)
+function Base.wait(tiles::TileCache; timeout=10)
     # wait for all tiles to get downloaded
-    while !isempty(tiles.tile_queue)
+    items = lock(tiles.tile_queue) do
+        copy(tiles.tile_queue.data)
+    end
+    tile_keys = filter!(!isnothing, map(t-> tile_key(tiles.provider, t), items))
+    start = time()
+    while true
+        if isempty(tiles.tile_queue) && all(tk -> haskey(tiles.fetched_tiles, tk), tile_keys)
+            break
+        end
+        if time() - start > timeout
+            @warn "Timeout while waiting for tiles to download"
+            break
+        end
         sleep(0.01)
     end
 end

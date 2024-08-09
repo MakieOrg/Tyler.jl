@@ -9,7 +9,6 @@ tex = load("amsterdam/texture.png")
 f, ax, pl = mesh(amsti; color=:gray)
 boundingbox(pl)
 
-
 lat, lon = (52.395593, 4.884704)
 delta = 0.01
 ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
@@ -18,8 +17,12 @@ begin
     lat, lon = (52.395593, 4.884704)
     delta = 0.01
     ext = Rect2f(lon-delta/2, lat-delta/2, delta, delta)
-    m1 = Tyler.Map(ext; max_parallel_downloads=3)
+    m1 = Tyler.Map(ext; scale=0.5)
 end
+for (k, (pl, t, bb)) in m1.plots
+    linesegments!(m1.axis.scene, bb, color=:red, depth_shift=-0.1f0)
+end
+
 
 begin
     lat, lon = (52.395593, 4.884704)

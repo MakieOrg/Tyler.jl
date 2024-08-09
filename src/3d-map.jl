@@ -21,8 +21,6 @@ function setup_axis!(axis::LScene, ext_target, crs)
     return
 end
 
-
-
 function Map3D(extent, extent_crs=wgs84;
         size=(1000, 1000),
         figure=Makie.Figure(; size=size),

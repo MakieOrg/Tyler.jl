@@ -58,13 +58,13 @@ end
 function remove_plot!(m::Map, key::String)
     if !haskey(m.plots, key)
         @warn "deleting non-existing plot"
-        delete!(m.should_be_plotted, key)
+        delete!(m.should_get_plotted, key)
         return
     end
     plot, _, _ = m.plots[key]
     plot.visible = false
     delete!(m.plots, key)
-    delete!(m.should_be_plotted, key)
+    delete!(m.should_get_plotted, key)
     push!(m.unused_plots, plot)
 end
 
@@ -81,7 +81,7 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     key = tile_key(m.provider, tile)
     # This can happen for tile providers with overlapping data that doesn't map 1:1 to tiles
     if haskey(m.plots, key)
-        delete!(m.should_be_plotted, key)
+        delete!(m.should_get_plotted, key)
         return
     end
 
@@ -99,7 +99,7 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
                     # the new plot has priority since it's in the newest current tile set
                     remove_plot!(m, other_key)
                 elseif haskey(m.current_tiles, other_tile)
-                    delete!(m.should_be_plotted, key)
+                    delete!(m.should_get_plotted, key)
                     # the existing plot has priority so we skip the new plot
                     return
                 else
@@ -107,7 +107,7 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
                     if abs(tile.z - m.zoom[]) <= abs(other_tile.z - m.zoom[])
                         remove_plot!(m, other_key)
                     else
-                        delete!(m.should_be_plotted, key)
+                        delete!(m.should_get_plotted, key)
                         return
                     end
                 end

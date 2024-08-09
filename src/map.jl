@@ -47,7 +47,7 @@ struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     # All tile plots we're currently plotting
     plots::ThreadSafeDict{String,Tuple{Makie.Plot,Tile,Rect}}
     # All tiles we currently wish to be plotting, but may not yet be downloaded + displayed
-    should_be_plotted::ThreadSafeDict{String,Tile}
+    should_get_plotted::ThreadSafeDict{String,Tile}
     display_task::Base.RefValue{Task}
 
     crs::CoordinateReferenceSystemFormat
@@ -123,7 +123,7 @@ function Map(extent, extent_crs=wgs84;
     fetching_scheme=Halo2DTiling(),
     max_zoom=TileProviders.max_zoom(provider),
     max_plots=400,
-    scale=0.5)
+    scale=1)
 
     # Extent
     # if extent input is a HyperRectangle then convert to type Extent
@@ -138,7 +138,7 @@ function Map(extent, extent_crs=wgs84;
     downloaded_tiles = tiles.downloaded_tiles
 
     plots = ThreadSafeDict{String,Tuple{Makie.Plot,Tile,Rect}}()
-    should_be_plotted = ThreadSafeDict{String,Tile}()
+    should_get_plotted = ThreadSafeDict{String,Tile}()
     current_tiles = ThreadSafeDict{Tile,Bool}()
     unused_plots = Makie.Plot[]
     display_task = Base.RefValue{Task}()
@@ -151,7 +151,7 @@ function Map(extent, extent_crs=wgs84;
         current_tiles,
         unused_plots,
         plots,
-        should_be_plotted,
+        should_get_plotted,
         display_task, crs,
         Observable(1),
         fetching_scheme, max_zoom, max_plots, Float64(scale)
@@ -166,7 +166,7 @@ function Map(extent, extent_crs=wgs84;
             if isnothing(data)
                 # download went wrong or provider doesn't have tile.
                 # That means we won't plot this tile and it should not be in the queue anymore
-                delete!(map.should_be_plotted, tile_key(map.provider, tile))
+                delete!(map.should_get_plotted, tile_key(map.provider, tile))
             else
                 create_tile_plot!(map, tile, data)
             end
@@ -187,17 +187,26 @@ function Map(extent, extent_crs=wgs84;
     return map
 end
 
-# Wait for all tiles to be loaded
-function Base.wait(map::AbstractMap)
+function Base.wait(m::AbstractMap; time_out=10)
     # The download + plot loops need a screen to do their work!
-    if isnothing(Makie.getscreen(map.figure.scene))
-        display(map.figure.scene)
+    if isnothing(Makie.getscreen(m.figure.scene))
+        screen = display(m.figure.scene)
     end
-    screen = Makie.getscreen(map.figure.scene)
-    isnothing(screen) &&
-        error("No screen after display. Wrong backend? Only WGLMakie and GLMakie are supported.")
-    wait(map.tiles)
-    return map
+    screen = Makie.getscreen(m.figure.scene)
+    isnothing(screen) && error("No screen after display.")
+    wait(m.tiles)
+    start = time()
+    while true
+        tile_keys = Set(tile_key.((m.provider,), keys(m.current_tiles)))
+        if all(k -> haskey(m.plots, k), tile_keys)
+            break
+        end
+        if time() - start > time_out
+            @warn "Timeout waiting for all tiles to be plotted"
+            break
+        end
+    end
+    return m
 end
 
 function tile_reloader(map::Map{Axis})
@@ -211,14 +220,6 @@ end
 
 function plotted_tiles(m::Map)
     return getindex.(values(m.plots), 2)
-end
-
-function queue_plot!(m::Map, tile)
-    key = tile_key(m.provider, tile)
-    isnothing(key) && return
-    m.should_be_plotted[key] = tile
-    put!(m.tiles.tile_queue, tile)
-    return
 end
 
 GeoInterface.crs(map::Map) = map.crs
@@ -252,19 +253,4 @@ function remove_unused!(m::AbstractMap, key::String)
         return plot, key
     end
     return nothing
-end
-
-function cleanup_queue!(m::AbstractMap, to_keep::OrderedSet{Tile})
-    queue = m.tiles.tile_queue
-    lock(queue) do
-        queued = queue.data
-        filter!(queued) do tile
-            if !(tile in to_keep)
-                Base._increment_n_avail(queue, -1)
-                return false
-            else
-                return true
-            end
-        end
-    end
 end

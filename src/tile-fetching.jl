@@ -1,16 +1,38 @@
 
+function queue_plot!(m::Map, tile)
+    key = tile_key(m.provider, tile)
+    # Provider doesn't have a tile for this
+    isnothing(key) && return
+    m.should_get_plotted[key] = tile
+    put!(m.tiles.tile_queue, tile)
+    return
+end
+
+function cleanup_queue!(m::AbstractMap, to_keep::OrderedSet{Tile})
+    queue = m.tiles.tile_queue
+    lock(queue) do
+        queued = queue.data
+        filter!(queued) do tile
+            if !(tile in to_keep)
+                Base._increment_n_avail(queue, -1)
+                return false
+            else
+                return true
+            end
+        end
+    end
+end
+
 function update_tiles!(m::Map, arealike)
     # Get the tiles to be plotted from the fetching scheme and arealike
     new_tiles_set, background_tiles = get_tiles_for_area(m, m.fetching_scheme, arealike)
 
+    queued_or_plotted = values(m.should_get_plotted)
+    to_add = setdiff(new_tiles_set, queued_or_plotted)
 
-    currently_plotted = values(m.should_be_plotted)
-    to_add = setdiff(new_tiles_set, currently_plotted)
     # We don't add any background tile to the current_tiles, so they stay shifted to the back
     # They get added async, so at this point `to_add` won't be in currently_plotted yet
-    will_be_plotted = union(new_tiles_set, currently_plotted)
-    # update_tileset!(m, new_tiles_set)
-
+    will_be_plotted = union(new_tiles_set, queued_or_plotted)
     # replace
     empty!(m.current_tiles)
     for tile in new_tiles_set
@@ -19,10 +41,11 @@ function update_tiles!(m::Map, arealike)
 
     # Move all plots to the back, that aren't in the newest tileset anymore
     for (key, (plot, tile, bounds)) in m.plots
+        dist = abs(m.zoom[] - tile.z)
         if haskey(m.current_tiles, tile)
-            move_in_front!(plot, abs(m.zoom[] - tile.z), bounds)
+            move_in_front!(plot, dist, bounds)
         else
-            move_to_back!(plot, abs(m.zoom[] - tile.z), bounds)
+            move_to_back!(plot, dist, bounds)
         end
     end
 
@@ -30,11 +53,23 @@ function update_tiles!(m::Map, arealike)
     to_add_background = setdiff(background_tiles, will_be_plotted)
     # Remove any item from queue, that isn't in the new set
     to_keep = union(background_tiles, will_be_plotted)
+    # Remove all tiles that are not in the new set from the queue
     cleanup_queue!(m, to_keep)
+
     # The unique is needed to avoid tiles referencing the same tile
-    # TODO, we should really consider to disallow this for tile providers, currently only allowed because of the PointCloudProvider
-    foreach(tile -> queue_plot!(m, tile), unique(t -> tile_key(m.provider, t), to_add))
-    foreach(tile -> queue_plot!(m, tile), unique(t -> tile_key(m.provider, t), to_add_background))
+    # TODO, we should really consider to disallow this for tile providers,
+    # This is currently only allowed because of the PointCloudProvider
+    background = unique(t -> tile_key(m.provider, t), to_add_background)
+    foreground = unique(t -> tile_key(m.provider, t), to_add)
+
+    # We lock the queue, to put all tiles in one go into the tile queue
+    # Since download workers take the last tiles first, foreground tiles go last
+    # Without the lock, a few (n_download_threads) background tiles would be downloaded first,
+    # since they will be the last in the queue until we add the foreground tiles
+    lock(m.tiles.tile_queue) do
+        foreach(tile -> queue_plot!(m, tile), background)
+        foreach(tile -> queue_plot!(m, tile), foreground)
+    end
 end
 
 #########################################################################################
