@@ -21,6 +21,7 @@ function to_web_mercator(lo,lat)
 end
 nothing # hide
 ````
+
 and downloading and preparing the data is done next
 
 ````@example whale
@@ -77,7 +78,7 @@ hidedecorations!(ax)
 hidespines!(ax)
 m
 ````
-![](whale_init_point.png)
+
 
 ## Animated trajectory
 
