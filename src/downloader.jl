@@ -30,7 +30,7 @@ struct PathDownloader <: AbstractDownloader
     lru::LRU{String, Int}
 end
 
-function PathDownloader(cache_dir; timeout=10, cache_size_gb=5)
+function PathDownloader(cache_dir; timeout=10, cache_size_gb=50)
     isdir(cache_dir) || mkpath(cache_dir)
     lru = LRU{String, Int}(maxsize=cache_size_gb * 10^9, by=identity)
     return PathDownloader(timeout, Downloads.Downloader(), cache_dir, lru)

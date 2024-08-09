@@ -21,7 +21,7 @@ TileProviders.max_zoom(::ElevationProvider) = 16
 function ElevationProvider(provider=TileProviders.Esri(:WorldImagery); cache_size_gb=5)
     TileFormat = get_tile_format(provider)
     fetched_tiles = LRU{String,TileFormat}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
-    downloader = [get_downloader(provider) for i in 1:Threads.nthreads()]
+    downloader = [get_downloader(provider) for i in 1:Threads.maxthreadid()]
     ElevationProvider(provider, fetched_tiles, downloader)
 end
 

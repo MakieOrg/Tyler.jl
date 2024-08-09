@@ -1,7 +1,10 @@
 struct TileCache{TileFormat,Downloader}
     provider::AbstractProvider
-    fetched_tiles::LRU{String,TileFormat}
+    # Nothing for unavailable tiles, so we don't download them again
+    fetched_tiles::LRU{String,Union{Nothing, TileFormat}}
     tile_queue::Channel{Tile}
+    # We also need to put! nothing for unavailable tiles into downloaded_tiles,
+    # so `Map` can clean up the expected tiles
     downloaded_tiles::Channel{Tuple{Tile,Union{Nothing, TileFormat}}}
     downloader::Vector{Downloader}
 end
@@ -28,8 +31,7 @@ function take_last!(c::Channel)
 end
 
 
-function run_loop(thread_id, tile_queue, fetched_tiles, downloader, provider, downloaded_tiles)
-    dl = downloader[thread_id]
+function run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
     while isopen(tile_queue) || isready(tile_queue)
         tile = take_last!(tile_queue) # priorize newly arrived tiles
         result = nothing
@@ -42,11 +44,21 @@ function run_loop(thread_id, tile_queue, fetched_tiles, downloader, provider, do
             # if the provider knows it doesn't have a tile, it can return nothing
             isnothing(key) && continue
             result = get!(fetched_tiles, key) do
-                fetch_tile(provider, dl, tile)
+                try
+                    return fetch_tile(provider, dl, tile)
+                catch e
+                    if isa(e, RequestError)
+                        status = e.response.status
+                        if (status == 404 || status == 500)
+                            @warn "tile $(tile) not available, will not download again" maxlog = 10
+                            return nothing
+                        end
+                    end
+                    rethrow(e)
+                end
             end
         catch e
             @warn "Error while fetching tile on thread $(Threads.threadid())" exception = (e, catch_backtrace())
-            # put!(tile_queue, tile)  # retry (not implemented, should have a max retry count and some error handling)
             nothing
         end
         put!(downloaded_tiles, (tile, result))
@@ -57,10 +69,10 @@ end
 function TileCache(provider; cache_size_gb=5, max_parallel_downloads=max(1, Threads.nthreads() ÷ 3))
     TileFormat = get_tile_format(provider)
     downloader = [get_downloader(provider) for i in 1:max_parallel_downloads]
-    fetched_tiles = LRU{String,TileFormat}(; maxsize=cache_size_gb * 10^9, by=Base.summarysize)
+    fetched_tiles = LRU{String,Union{Nothing, TileFormat}}(; maxsize=cache_size_gb * 10^9, by=Base.summarysize)
     downloaded_tiles = Channel{Tuple{Tile,Union{Nothing, TileFormat}}}(Inf)
     tile_queue = Channel{Tile}(Inf)
-    async = Threads.nthreads() <= 1
+    async = Threads.nthreads(:default) <= 1
 
     if async && max_parallel_downloads > 1
         @warn "Multiple download threads are not supported with Threads.nthreads()==1, falling back to async. Start Julia with more threads for parallel downloads."
@@ -68,10 +80,11 @@ function TileCache(provider; cache_size_gb=5, max_parallel_downloads=max(1, Thre
     end
     @assert max_parallel_downloads > 0
     for thread in 1:max_parallel_downloads
+        dl = downloader[thread]
         if async
-            @async run_loop(thread, tile_queue, fetched_tiles, downloader, provider, downloaded_tiles)
+            @async run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
         else
-            Threads.@spawn run_loop(thread, tile_queue, fetched_tiles, downloader, provider, downloaded_tiles)
+            Threads.@spawn run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
         end
     end
     return TileCache{TileFormat,eltype(downloader)}(provider, fetched_tiles, tile_queue, downloaded_tiles, downloader)

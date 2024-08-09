@@ -73,6 +73,57 @@ get_preprocess(config::PlotConfig) = config.preprocess
 get_postprocess(config) = identity
 get_postprocess(config::PlotConfig) = config.postprocess
 
+
+function filter_overlapping!(m::Map, bounds::Rect2, tile, key)
+    # dont filter for 2d plots
+end
+
+function filter_overlapping!(m::Map, bounds::Rect3, tile, key)
+    # for 3d meshes, we need to remove any plot in the same 2d area
+    bounds2d = Rect2d(bounds)
+    for (other_key, (plot, other_tile, other_bounds)) in copy(m.plots)
+        other_bounds2d = Rect2d(other_bounds)
+        # If overlap
+        if bounds2d in other_bounds2d || other_bounds2d in bounds2d
+            if haskey(m.current_tiles, tile)
+                # the new plot has priority since it's in the newest current tile set
+                remove_plot!(m, other_key)
+            elseif haskey(m.current_tiles, other_tile)
+                delete!(m.should_get_plotted, key)
+                # the existing plot has priority so we skip the new plot
+                return true
+            else
+                # If both are not in current_tiles, we remove the plot farthest away from the current zoom level
+                if abs(tile.z - m.zoom[]) <= abs(other_tile.z - m.zoom[])
+                    remove_plot!(m, other_key)
+                else
+                    delete!(m.should_get_plotted, key)
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+function cull_plots!(m::Map)
+    if length(m.plots) >= (m.max_plots - 1)
+        # remove the oldest plot
+        p_tiles = plotted_tiles(m)
+        available_to_remove = setdiff(p_tiles, keys(m.current_tiles))
+        sort!(available_to_remove, by=tile -> abs(tile.z - m.zoom[]))
+        n_avail = length(available_to_remove)
+        need_to_remove = min(n_avail, length(m.plots) - m.max_plots)
+        to_remove = available_to_remove[1:need_to_remove]
+        for tile in to_remove
+            plot_key = remove_unused!(m, tile)
+            if !isnothing(plot_key)
+                remove_plot!(m, plot_key[2])
+            end
+        end
+    end
+end
+
 function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     # For providers which have to map the same data to different tiles
     # Or providers that have e.g. additional parameters like a date
@@ -88,56 +139,19 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     cfg = m.plot_config
     data_processed = get_preprocess(cfg)(data)
     bounds = get_bounds(tile, data_processed, m.crs)
-    if bounds isa Rect3
-        # for 3d meshes, we need to remove any plot in the same 2d area
-        bounds2d = Rect2d(bounds)
-        for (other_key, (plot, other_tile, other_bounds)) in copy(m.plots)
-            other_bounds2d = Rect2d(other_bounds)
-            # If overlap
-            if bounds2d in other_bounds2d || other_bounds2d in bounds2d
-                if haskey(m.current_tiles, tile)
-                    # the new plot has priority since it's in the newest current tile set
-                    remove_plot!(m, other_key)
-                elseif haskey(m.current_tiles, other_tile)
-                    delete!(m.should_get_plotted, key)
-                    # the existing plot has priority so we skip the new plot
-                    return
-                else
-                    # If both are not in current_tiles, we remove the plot farthest away from the current zoom level
-                    if abs(tile.z - m.zoom[]) <= abs(other_tile.z - m.zoom[])
-                        remove_plot!(m, other_key)
-                    else
-                        delete!(m.should_get_plotted, key)
-                        return
-                    end
-                end
-            end
-        end
-    end
 
-    # Cull unused plots
-    if length(m.plots) >= (m.max_plots - 1)
-        # remove the oldest plot
-        p_tiles = plotted_tiles(m)
-        available_to_remove = setdiff(p_tiles, keys(m.current_tiles))
-        sort!(available_to_remove, by=tile-> abs(tile.z - m.zoom[]))
-        n_avail = length(available_to_remove)
-        need_to_remove = min(n_avail, length(m.plots) - m.max_plots)
-        to_remove = available_to_remove[1:need_to_remove]
-        for tile in to_remove
-            plot_key = remove_unused!(m, tile)
-            if !isnothing(plot_key)
-                remove_plot!(m, plot_key[2])
-            end
-        end
-    end
+    this_got_filtered = filter_overlapping!(m, bounds, tile, key)
+    this_got_filtered && return # skip plotting if it overlaps with a more important plot
 
-    # if isempty(m.unused_plots)
+    # Cull plots over plot limit
+    cull_plots!(m)
+
+    if isempty(m.unused_plots)
         mplot = create_tileplot!(cfg, m.axis, data_processed, bounds, (tile, m.crs))
-    # else
-    #     mplot = pop!(m.unused_plots)
-    #     update_tile_plot!(mplot, cfg, m.axis, data_processed, bounds, (tile, m.crs))
-    # end
+    else
+        mplot = pop!(m.unused_plots)
+        update_tile_plot!(mplot, cfg, m.axis, data_processed, bounds, (tile, m.crs))
+    end
 
     if haskey(m.current_tiles, tile)
         move_in_front!(mplot, abs(m.zoom[] - tile.z), bounds)

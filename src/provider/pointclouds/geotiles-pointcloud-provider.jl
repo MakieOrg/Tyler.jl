@@ -46,7 +46,7 @@ function get_ahn_sub_mapping()
 end
 
 function GeoTilePointCloudProvider(; baseurl="https://geotiles.citg.tudelft.nl", subset="AHN1_T")
-    projs = [Proj.Transformation(GFT.EPSG(28992), GFT.EPSG(3857)) for i in 1:Threads.nthreads()]
+    projs = [Proj.Transformation(GFT.EPSG(28992), GFT.EPSG(3857)) for i in 1:Threads.maxthreadid()]
     return GeoTilePointCloudProvider(baseurl, subset, get_ahn_sub_mapping(), projs)
 end
 
