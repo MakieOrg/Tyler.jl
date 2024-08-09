@@ -119,7 +119,7 @@ function Map(extent, extent_crs=wgs84;
     provider=TileProviders.OpenStreetMap(:Mapnik),
     crs=MapTiles.web_mercator,
     cache_size_gb=5,
-    max_parallel_downloads=min(1, Threads.nthreads(:default) ÷ 3),
+    max_parallel_downloads=max(1, Threads.nthreads(:default) ÷ 3),
     fetching_scheme=Halo2DTiling(),
     max_zoom=TileProviders.max_zoom(provider),
     max_plots=400,
@@ -187,24 +187,25 @@ function Map(extent, extent_crs=wgs84;
     return map
 end
 
-function Base.wait(m::AbstractMap; time_out=10)
+function Base.wait(m::AbstractMap; timeout=50)
     # The download + plot loops need a screen to do their work!
     if isnothing(Makie.getscreen(m.figure.scene))
         screen = display(m.figure.scene)
     end
     screen = Makie.getscreen(m.figure.scene)
     isnothing(screen) && error("No screen after display.")
-    wait(m.tiles)
+    wait(m.tiles; timeout=timeout)
     start = time()
     while true
         tile_keys = Set(tile_key.((m.provider,), keys(m.current_tiles)))
         if all(k -> haskey(m.plots, k), tile_keys)
             break
         end
-        if time() - start > time_out
+        if time() - start > timeout
             @warn "Timeout waiting for all tiles to be plotted"
             break
         end
+        sleep(0.01)
     end
     return m
 end

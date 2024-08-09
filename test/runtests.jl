@@ -6,7 +6,7 @@ using GeoInterface
 
 # Default
 london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
-m = Tyler.Map(london)
+m = Tyler.Map(london); m.figure.scene
 s = display(m) # waits until all tiles are displayed
 @test isempty(m.tiles.tile_queue)
 @test length(m.current_tiles) == 25

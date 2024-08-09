@@ -39,10 +39,6 @@ show map
 
 ````@example plottypes
 m = Tyler.Map(extent; provider, size=(1000, 600))
-# wait for tiles to fully load
-wait(m)
-save("map_plottypes.png", current_figure()) # hide
-nothing # hide
 ````
 
 ![](map_plottypes.png)
@@ -72,7 +68,4 @@ text!(pts2, text = "Basic Example"; fontsize = 30,
     color = :darkblue, align = (:center, :center)
     )
 m
-save("map_plottypes_all.png", current_figure()) # hide
-nothing # hide
 ````
-![](map_plottypes_all.png)
