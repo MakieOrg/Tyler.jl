@@ -41,8 +41,6 @@ show map
 m = Tyler.Map(extent; provider, size=(1000, 600))
 ````
 
-![](map_plottypes.png)
-
 now plot a point, polygon and text on the map
 
 ````@example plottypes
