@@ -66,14 +66,19 @@ function run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
     end
 end
 
-function TileCache(provider; cache_size_gb=5, max_parallel_downloads=max(1, Threads.nthreads() ÷ 3))
+function Base.close(tiles::TileCache)
+    close(tiles.tile_queue)
+    close(tiles.downloaded_tiles)
+    empty!(tiles.fetched_tiles)
+end
+
+function TileCache(provider; cache_size_gb=5, max_parallel_downloads=1)
     TileFormat = get_tile_format(provider)
     downloader = [get_downloader(provider) for i in 1:max_parallel_downloads]
     fetched_tiles = LRU{String,Union{Nothing, TileFormat}}(; maxsize=cache_size_gb * 10^9, by=Base.summarysize)
     downloaded_tiles = Channel{Tuple{Tile,Union{Nothing, TileFormat}}}(Inf)
     tile_queue = Channel{Tile}(Inf)
     async = Threads.nthreads(:default) <= 1
-
     if async && max_parallel_downloads > 1
         @warn "Multiple download threads are not supported with Threads.nthreads()==1, falling back to async. Start Julia with more threads for parallel downloads."
         async = true

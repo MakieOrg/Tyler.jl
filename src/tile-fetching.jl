@@ -11,14 +11,19 @@ end
 function cleanup_queue!(m::AbstractMap, to_keep::OrderedSet{Tile})
     queue = m.tiles.tile_queue
     lock(queue) do
+        tiles = Tile[]
         queued = queue.data
         filter!(queued) do tile
             if !(tile in to_keep)
                 Base._increment_n_avail(queue, -1)
+                push!(tiles, tile)
                 return false
             else
                 return true
             end
+        end
+        for tile in tiles
+            delete!(m.should_get_plotted, tile_key(m.provider, tile))
         end
     end
 end
@@ -26,7 +31,11 @@ end
 function update_tiles!(m::Map, arealike)
     # Get the tiles to be plotted from the fetching scheme and arealike
     new_tiles_set, background_tiles = get_tiles_for_area(m, m.fetching_scheme, arealike)
-
+    if length(new_tiles_set) > m.max_plots
+        @warn "Too many tiles to plot, which means zoom level is not supported. Plotting no tiles for this zoomlevel." maxlog = 1
+        new_tiles_set = OrderedSet{Tile}()
+        background_tiles = OrderedSet{Tile}()
+    end
     queued_or_plotted = values(m.should_get_plotted)
     to_add = setdiff(new_tiles_set, queued_or_plotted)
 
@@ -90,7 +99,8 @@ function get_tiles_for_area(m::Map{Axis}, scheme::Halo2DTiling, area::Union{Rect
     depth = scheme.depth
 
     # Calculate the zoom level
-    zoom = optimal_zoom(m, norm(widths(to_rect(area))))
+    # TODO, also early return if too many tiles to plot?
+    ideal_zoom, zoom, approx_ntiles = optimal_zoom(m, norm(widths(to_rect(area))))
     m.zoom[] = zoom
 
     # And the z layers we will plot
@@ -137,7 +147,7 @@ function get_tiles_for_area(m::Map, ::SimpleTiling, area::Union{Rect,Extent})
     area = typeof(area) <: Rect ? Extents.extent(area) : area
     diag = norm(widths(to_rect(area)))
     # Calculate the zoom level
-    zoom = optimal_zoom(m, diag)
+    ideal_zoom, zoom, approx_ntiles = optimal_zoom(m, diag)
     m.zoom[] = zoom
     return OrderedSet{Tile}(MapTiles.TileGrid(area, zoom, m.crs)), OrderedSet{Tile}()
 end
@@ -152,8 +162,8 @@ function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camer
     points = frustrum_plane_intersection(cam, camc)
     eyepos = camc.eyeposition[]
     maxdist, _ = findmax(p -> norm(p[3] .- eyepos), points)
-    camc.far[] = maxdist * 10
-    camc.near[] = eyepos[3] * 0.001
+    camc.far[] = maxdist
+    camc.near[] = eyepos[3] * 0.01
     update_cam!(m.axis.scene)
     return tiles_from_poly(m, points), OrderedSet{Tile}()
 end
@@ -182,13 +192,17 @@ end
 
 function optimal_zoom(m::Map, diagonal)
     diagonal_res = norm(get_resolution(m)) * m.scale
-    zoomrange = min_zoom(m):max_zoom(m)
-    optimal_zoom(m.crs, diagonal, diagonal_res, zoomrange, m.zoom[])
+    # Go over complete known zoomrange of any provider.
+    # So that we can get the theoretical optimal zoom level, even if the provider doesn't support it,
+    # which we can then use to calculate the distance to the supported zoomlevel and may decide to not plot anything.
+    # (TODO, how exactly can we get this over all providers?)
+    zoomrange = 1:22
+    z = optimal_zoom(m.crs, diagonal, diagonal_res, zoomrange, m.zoom[])
+    actual_zoom = clamp(z, min_zoom(m), max_zoom(m))
+    return z, actual_zoom, approx_tiles(m, actual_zoom, diagonal)
 end
 
 function optimal_zoom(crs, diagonal, diagonal_resolution, zoom_range, old_zoom)
-    # Some provider only support one zoom level
-    length(zoom_range) == 1 && return zoom_range[1]
     # TODO, this should come from provider
     tile_diag_res = norm((255, 255))
     target_ntiles = diagonal_resolution / tile_diag_res
@@ -212,4 +226,12 @@ function optimal_zoom(crs, diagonal, diagonal_resolution, zoom_range, old_zoom)
     end
     dist, idx = findmin(x -> abs(x.ntiles - target_ntiles), candidates)
     return candidates[idx].z
+end
+
+function approx_tiles(m::Map, zoom, diagonal)
+    ext = Extents.extent(Tile(0, 0, zoom), m.crs)
+    mini, maxi = Point2.(ext.X, ext.Y)
+    diag = norm(maxi .- mini)
+    ntiles_diag = diagonal / diag
+    return (ntiles_diag / sqrt(2)) ^ 2
 end

@@ -65,12 +65,44 @@ begin
     provider = GeoTilePointCloudProvider(subset=subset)
     image = ElevationProvider(nothing)
     cfg = Tyler.MeshScatterPlotconfig(markersize=5, marker=Rect3f(Vec3f(0), Vec3f(1)))
-    m1 = Tyler.Map3D(ext; provider=provider, plot_config=cfg)
-    cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=FastShading, colormap=:alpine)
-    m2 = Tyler.Map3D(m1; provider=image, plot_config=cfg)
+    m1 = Tyler.Map3D(ext; provider=provider, plot_config=cfg, max_parallel_downloads=1)
+    cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=FastShading, colormap=:alpine, postprocess=(p-> translate!(p, 0, 0, -1f0)))
+    m2 = Tyler.Map3D(m1; provider=image, plot_config=cfg, max_parallel_downloads=1)
     m1
 end
 
+using GeometryBasics, GLMakie, Tyler, TileProviders
+using Tyler: ElevationProvider, GeoTilePointCloudProvider
+using MapTiles
+using MeshIO, FileIO
+begin
+    lat, lon = (52.395593, 4.884704)
+    delta = 0.02
+    ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
+    subset = "AHN1_T" # Takes reasonably long to load (~1-5mb compressed per tile)
+    # subset = "AHN4_T" # Takes _really_ long to load, even from disk (~300mb compressed points per tile)
+    provider = GeoTilePointCloudProvider(subset=subset)
+    m1 = Tyler.Map3D(ext; provider=provider, max_parallel_downloads=1)
+    cfg = Tyler.PlotConfig(shading=FastShading, colormap=:alpine, postprocess=(p -> translate!(p, 0, 0, -100.0f0)))
+    m2 = Tyler.Map3D(ext; provider=ElevationProvider(), figure=m1.figure, axis=m1.axis, max_parallel_downloads=1, plot_config=cfg)
+    m1
+end
+max_zoom(m1)
+Tyler.approx_tiles(m1, , 1000)
+
+m1.current_tiles
+m1.tiles.tile_queue
+m1.plots
+m1.should_get_plotted
+
+Tyler.cleanup_queue!(m1, Tyler.OrderedSet{Tile}())
+
+m1.axis.scene.camera_controls.near[] = 100
+m1.axis.scene.camera_controls.far[] = 10000
+update_cam!(m1.axis.scene)
+pp1 = Makie.project.((m1.axis.scene,), :data, :clip, maximum.(bb1))
+pp2 = Makie.project.((m1.axis.scene,), :data, :clip, maximum.(bb2))
+mean(Float32.(abs.(last.(pp1) .- last.(pp2[1:12]))))
 
 begin
     lat, lon = (52.395593, 4.884704)
@@ -80,12 +112,9 @@ begin
     # subset = "AHN4_T" # Takes _really_ long to load, even from disk (~300mb compressed points per tile)
     provider = GeoTilePointCloudProvider(subset=subset)
     m1 = Tyler.Map3D(ext; provider=provider)
-    m2 = Tyler.Map3D(ext; provider=ElevationProvider(), max_plots=20, figure=m1.figure, axis=m1.axis)
+    m2 = Tyler.Map3D(ext; provider=ElevationProvider(), figure=m1.figure, axis=m1.axis)
     m1
 end
-
-unique_plots = unique(Tyler.tile_key.((m1.provider,), keys(m1.current_tiles)))
-length(unique_plots) == length(m1.plots)
 
 using RPRMakie, FileIO
 

@@ -119,11 +119,15 @@ function tiles_from_poly(m::Map, points)
     points_s = sort(points, by=(x -> norm(x .- mini)))
     start = points_s[1]
     diagonal = norm(points_s[end] .- start)
-    zoom = optimal_zoom(m, diagonal)
-    m.zoom[] = zoom
+    zoom, actual_zoom, ntiles_approx = optimal_zoom(m, diagonal)
+    if abs(actual_zoom - zoom) > 2 || ntiles_approx > m.max_plots
+        @warn "Too many tiles to plot, which means zoom level is not supported. Plotting no tiles for this zoomlevel." maxlog = 1
+        return OrderedSet{Tile}()
+    end
+    m.zoom[] = actual_zoom
     boundingbox = Rect2d(Rect3d(points))
     ext = Extents.extent(boundingbox)
-    tilegrid = TileGrid(ext, zoom, m.crs)
+    tilegrid = TileGrid(ext, actual_zoom, m.crs)
     tiles = OrderedSet{Tile}()
     poly = Polygon(map(p-> Point2d(p[1], p[2]), points))
     for tile in tilegrid

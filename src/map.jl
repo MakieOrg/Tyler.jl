@@ -111,6 +111,15 @@ end
 
 toggle_visibility!(m::Map) = m.axis.scene.visible[] = !m.axis.scene.visible[]
 
+function Base.close(m::Map)
+    cleanup_queue!(m, OrderedSet{Tile}())
+    empty!(m.current_tiles)
+    empty!(m.unused_plots)
+    empty!(m.plots)
+    empty!(m.should_get_plotted)
+    close(m.tiles)
+end
+
 function Map(extent, extent_crs=wgs84;
     size=(1000, 1000),
     figure=Makie.Figure(; size=size),
@@ -119,7 +128,7 @@ function Map(extent, extent_crs=wgs84;
     provider=TileProviders.OpenStreetMap(:Mapnik),
     crs=MapTiles.web_mercator,
     cache_size_gb=5,
-    max_parallel_downloads=max(1, Threads.nthreads(:default) ÷ 3),
+    max_parallel_downloads=1,
     fetching_scheme=Halo2DTiling(),
     max_zoom=TileProviders.max_zoom(provider),
     max_plots=400,
@@ -182,6 +191,7 @@ function Map(extent, extent_crs=wgs84;
             closed[] = true
             # remove all queued tiles!
             cleanup_queue!(map, OrderedSet{Tile}())
+            close(map)
         end
     end
     return map

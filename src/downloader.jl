@@ -10,12 +10,14 @@ struct ByteDownloader <: AbstractDownloader
     bytes::Vector{UInt8}
 end
 
-function ByteDownloader(timeout=10)
-    return ByteDownloader(timeout, Downloads.Downloader(), IOBuffer(), UInt8[])
+function ByteDownloader(timeout=3)
+    downloader = Downloads.Downloader()
+    downloader.easy_hook = (easy, info) -> Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_LOW_SPEED_TIME, timeout)
+    return ByteDownloader(timeout, downloader, IOBuffer(), UInt8[])
 end
 
 function download_tile_data(dl::ByteDownloader, provider, url)
-    Downloads.download(url, dl.io; downloader=dl.downloader)
+    Downloads.download(url, dl.io; downloader=dl.downloader, timeout=dl.timeout)
     # a bit of shananigans to allocate less and stress the GC less!
     resize!(dl.bytes, dl.io.ptr - 1)
     copyto!(dl.bytes, 1, dl.io.data, 1, dl.io.ptr-1)
@@ -30,10 +32,12 @@ struct PathDownloader <: AbstractDownloader
     lru::LRU{String, Int}
 end
 
-function PathDownloader(cache_dir; timeout=10, cache_size_gb=50)
+function PathDownloader(cache_dir; timeout=5, cache_size_gb=50)
     isdir(cache_dir) || mkpath(cache_dir)
     lru = LRU{String, Int}(maxsize=cache_size_gb * 10^9, by=identity)
-    return PathDownloader(timeout, Downloads.Downloader(), cache_dir, lru)
+    downloader = Downloads.Downloader()
+    downloader.easy_hook = (easy, info) -> Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_LOW_SPEED_TIME, timeout)
+    return PathDownloader(timeout, downloader, cache_dir, lru)
 end
 
 function unique_filename(url)
