@@ -75,6 +75,7 @@ get_postprocess(config::PlotConfig) = config.postprocess
 
 
 function filter_overlapping!(m::Map, bounds::Rect2, tile, key)
+    return false
     # dont filter for 2d plots
 end
 
