@@ -32,12 +32,7 @@ p2 = Tyler.Interpolator(fun; options)
 
 b = Rect2f(-20.0, -20.0, 40.0, 40.0)
 m = Tyler.Map(b, provider=p1)
-wait(m)
-save("interpolation.png", current_figure()) # hide
-nothing # hide
 ````
-
-![](interpolation.png)
 
 ::: tip
 
