@@ -32,20 +32,14 @@ set how much area to map in degrees and define an `Extent` for display in web_me
 
 ````@example plottypes
 delta = 1
-extent = Extent(X = (lon - delta/2, lon + delta/2), Y = (lat-delta/2, lat+delta/2));
+extent = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta);
 ````
 
 show map
 
 ````@example plottypes
-m = Tyler.Map(extent; provider, figure=Figure(; size=(1000, 600)))
-# wait for tiles to fully load
-wait(m)
-save("map_plottypes.png", current_figure()) # hide
-nothing # hide
+m = Tyler.Map(extent; provider, size=(1000, 600))
 ````
-
-![](map_plottypes.png)
 
 now plot a point, polygon and text on the map
 
@@ -53,10 +47,10 @@ now plot a point, polygon and text on the map
 objscatter = scatter!(m.axis, pts; color = :red,
     marker = '⭐', markersize = 50)
 # hide ticks, grid and lables
-hidedecorations!(m.axis) 
+hidedecorations!(m.axis)
 # hide frames
 hidespines!(m.axis)
-# Plot a plygon on the map 
+# Plot a plygon on the map
 p1 = (lon-delta/8, lat-delta/8)
 p2 = (lon-delta/8, lat+delta/8)
 p3 = (lon+delta/8, lat+delta/8)
@@ -72,7 +66,4 @@ text!(pts2, text = "Basic Example"; fontsize = 30,
     color = :darkblue, align = (:center, :center)
     )
 m
-save("map_plottypes_all.png", current_figure()) # hide
-nothing # hide
 ````
-![](map_plottypes_all.png)

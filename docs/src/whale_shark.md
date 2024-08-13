@@ -21,6 +21,7 @@ function to_web_mercator(lo,lat)
 end
 nothing # hide
 ````
+
 and downloading and preparing the data is done next
 
 ````@example whale
@@ -56,11 +57,7 @@ fig = Figure(; size = (1200, 600))
 ax = Axis(fig[1,1])
 m = Tyler.Map(Rect2f(Rect2f(lomn - δlon/2, lamn-δlat/2, 2δlon, 2δlat));
     provider, figure=fig, axis=ax)
-wait(m)
-save("whale_init.png", fig) # hide
-nothing # hide
 ````
-![](whale_init.png)
 
 ## Initial point
 
@@ -79,11 +76,9 @@ objscatter = scatter!(ax, whale; markersize = 15, color = :orangered,
     strokecolor=:white, strokewidth=1.5)
 hidedecorations!(ax)
 hidespines!(ax)
-
-save("whale_init_point.png", fig) # hide
-nothing # hide
+m
 ````
-![](whale_init_point.png)
+
 
 ## Animated trajectory
 
