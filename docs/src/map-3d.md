@@ -24,7 +24,7 @@ delta = 0.3
 ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
 cfg = Tyler.PlotConfig(
     preprocess=pc -> map(p -> p .* 2, pc),
-    shading=FastShading,
+    shading=FastShading, colorrange=(2000, 5000),
     colormap=:alpine
 )
 m = Tyler.Map3D(ext; provider=ElevationProvider(nothing), plot_config=cfg)
