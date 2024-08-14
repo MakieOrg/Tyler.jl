@@ -16,7 +16,7 @@ using Makie: AbstractAxis
 using LinearAlgebra, GeometryBasics
 using GeometryBasics
 using Proj
-using Statistics, DelimitedFiles
+using Statistics
 using PointClouds
 using ArchGDAL
 import GeoFormatTypes as GFT
