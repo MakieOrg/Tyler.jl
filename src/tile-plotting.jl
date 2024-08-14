@@ -197,10 +197,12 @@ function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::Elevatio
     # not so elegant with empty array, we may want to make this a bit nicer going forward
     color = isempty(data.color) ? (;) : (color=data.color,)
     mini, maxi = extrema(bounds)
+    uv_transform = isempty(data.color) ? Makie.automatic : Mat{2,3,Float32}(0, 1, 1, 0, 0, 0)
     p = Makie.surface!(
         axis.scene,
         (mini[1], maxi[1]), (mini[2], maxi[2]), data.elevation;
         color...,
+        uv_transform = uv_transform,
         shading=Makie.NoShading,
         inspectable=false,
         colorrange=data.elevation_range,
@@ -230,7 +232,8 @@ function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::ImageDat
     mini, maxi = extrema(bounds)
     plot = Makie.image!(
         axis.scene,
-        (mini[1], maxi[1]), (mini[2], maxi[2]), rotr90(data);
+        (mini[1], maxi[1]), (mini[2], maxi[2]), data;
+        uv_transform=Mat{2,3,Float32}(0, 1, 1, 0, 0, 0),
         inspectable=false,
         config.attributes...
     )
@@ -241,10 +244,9 @@ function update_tile_plot!(plot::Makie.Image, ::PlotConfig, axis::AbstractAxis, 
     mini, maxi = extrema(bounds)
     plot[1] = (mini[1], maxi[1])
     plot[2] = (mini[2], maxi[2])
-    plot[3] = rotr90(data)
+    plot[3] = data
     return
 end
-
 
 ############################
 #### PointCloudData Data plotting
@@ -315,7 +317,6 @@ function update_tile_plot!(plot::Makie.MeshScatter, ::MeshScatterPlotconfig, ::A
     plot.markersize = data.msize
     return
 end
-
 
 
 ############################
