@@ -90,4 +90,10 @@ with_theme(theme_dark()) do
 end
 ````
 
+::: info
+
+Note that this expands the original domain.
+
+:::
+
 Next, we could add any other plot type on top of the `ax` axis defined above.
