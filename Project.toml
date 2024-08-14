@@ -29,6 +29,7 @@ ThreadSafeDicts = "4239201d-c60e-5e0a-9702-85d713665ba7"
 TileProviders = "263fe934-28e1-4ae9-998a-c2629c5fede6"
 
 [compat]
+ArchGDAL = "0.10"
 Colors = "0.12"
 Downloads = "1"
 Extents = "0.1.2"
