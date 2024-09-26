@@ -62,7 +62,9 @@ basemap(TileProviders.Google(), Extent(X = (-0.0921, -0.0521), Y = (51.5, 51.525
 
 `res` should be a tuple of the form `(X=xres, Y=yres)` to match the extent.
 """
-function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Rect2{<: Real}, Extent}; size = nothing, res = nothing, min_zoom_level = 0, max_zoom_level = 16)
+function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Rect2{<: Real}, Extent}; 
+        size = nothing, res = nothing, min_zoom_level = 0, max_zoom_level = 16
+    )
     bbox = Extents.extent(boundingbox)
     # First, handle keyword arguments
     @assert (isnothing(size) || isnothing(res)) "You must provide either `size` or `res`, but not both."
