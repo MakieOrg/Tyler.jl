@@ -23,7 +23,7 @@ Below are some cool examples of using basemaps.
 #### Cover example of London
 
 ````@example coverlondon
-using Tyler
+using Tyler, TileProviders
 
 xs, ys, img = basemap(
     TileProviders.OpenStreetMap(),
@@ -67,7 +67,7 @@ BACKEND.activate!() # hide
 ### OpenSnowMap on polar stereographic projection
 
 ````@example opensnowmap
-using Tyler, GeoMakie, Makie
+using Tyler, TileProviders, GeoMakie, Makie
 
 meshimage(
     basemap(
