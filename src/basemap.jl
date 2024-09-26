@@ -16,8 +16,49 @@ You do still have to provide the extent and image size, but this is substantiall
 
 =#
 
+
 """
-    basemap(provider::TileProviders.Provider, bbox::Extent; size, res, min_zoom_level = 0, max_zoom_level = 16)::(xs, ys, img)
+    _z_index(extent::Extent, res::NamedTuple, crs::WebMercator) => Int
+
+Calculate a z value from `extent` and pixel resolution `res` for `crs`.
+The rounded mean calculated z-index for X and Y resolutions is returned.
+
+`res` should be `(X=xres, Y=yres)` to match the extent.
+
+We assume tiles are the standard 256*256 pixels. Note that this is not an
+enforced standard, and that retina tiles are 512*512.
+"""
+function _z_index(extent::Union{Rect,Extent}, res::NamedTuple, crs; tile_size = 256)
+    # Calculate the number of tiles at each z and get the one
+    # closest to the resolution `res`
+    target_ntiles = prod(map(r -> r / tile_size, res))
+    tiles_at_z = map(1:24) do z
+        length(TileGrid(extent, z, crs))
+    end
+    return findmin(x -> abs(x - target_ntiles), tiles_at_z)[2]
+end
+
+"""
+    basemap(provider::TileProviders.Provider, bbox::Extent; size, res, min_zoom_level, max_zoom_level)::(xs, ys, img)
+
+Download the most suitable basemap for the given bounding box and size, return a tuple of `(x_interval, y_interval, image)`.
+All returned coordinates and images are in the **Web Mercator** coordinate system (since that's how tiles are defined).
+
+The input bounding box must be in the **WGS84** (long/lat) coordinate system.
+
+## Example
+
+```julia
+basemap(TileProviders.Google(), Extent(X = (-0.0921, -0.0521), Y = (51.5, 51.525)), size   = (1000, 1000))
+```
+
+## Keyword arguments
+
+`size` and `res` are mutually exclusive, and you must provide one.
+
+`min_zoom_level - 0` and `max_zoom_level = 16` are the minimum and maximum zoom levels to consider.
+
+`res` should be a tuple of the form `(X=xres, Y=yres)` to match the extent.
 """
 function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Rect2{<: Real}, Extent}; size = nothing, res = nothing, min_zoom_level = 0, max_zoom_level = 16)
     bbox = Extents.extent(boundingbox)
@@ -36,7 +77,7 @@ end
 function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Rect2{<: Real}, Extent}, size::Tuple{Int, Int}; min_zoom_level = 0, max_zoom_level = 16)
     bbox = Extents.extent(boundingbox)
     # Obtain the optimal Z-index that covers the bbox at the desired resolution.
-    optimal_z_index = clamp(z_index(bbox, (X=size[2], Y=size[1]), MapTiles.WGS84()), min_zoom_level, max_zoom_level)
+    optimal_z_index = clamp(_z_index(bbox, (X=size[2], Y=size[1]), MapTiles.WGS84()), min_zoom_level, max_zoom_level)
     # Generate a `TileGrid` from our zoom level and bbox.
     tilegrid = MapTiles.TileGrid(bbox, optimal_z_index, MapTiles.WGS84())
     # Compute the dimensions of the tile grid, so we can feed them into a 
@@ -46,6 +87,7 @@ function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Re
     Here we assume all tiles are 256x256.  
     It's easy to compute this though, by either:
     - Making a sample query for the tile (0, 0, 0) (but you are not guaranteed this exists)
+    - Some function that returns the tile size for a given provider / dispatch form
     =#
     tile_widths = (256, 256)
     tilegrid_size = tile_widths .* length.(tilegrid.grid.indices)
@@ -62,7 +104,7 @@ function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Re
         url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
         result = HTTP.get(url)
         # Read into an in-memory array (Images.jl layout)
-        img = FileIO.load(FileIO.query(IOBuffer(result)))
+        img = FileIO.load(FileIO.query(IOBuffer(result.body)))
         # The thing with the y indices is that they go in the reverse of the natural order.
         # So, we simply subtract the y index from the end index to get the correct placement.
         image_start_relative = (
@@ -81,6 +123,7 @@ function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Re
     end
     # Now, we have a complete image.
     # We can also produce the image's axes:
+    # Note that this is in the Web Mercator coordinate system.
     return (tilegrid_extent.X, tilegrid_extent.Y, image_receptacle)
 end
 
