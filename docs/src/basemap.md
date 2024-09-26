@@ -48,9 +48,7 @@ using Tyler, TileProviders, GeoMakie, CairoMakie, Makie
 provider = TileProviders.NASAGIBS(:ViirsEarthAtNight2012)
 
 xs, ys, img = basemap(provider, Extent(X=(-90, 90), Y=(-90, 90)), (1024, 1024))
-````
 
-````@example nasagibs
 meshimage(
     xs, ys, img; 
     source = "+proj=webmerc", # REMEMBER: `img` is always in Web Mercator...
