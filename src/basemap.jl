@@ -16,6 +16,8 @@ You do still have to provide the extent and image size, but this is substantiall
 
 =#
 
+export basemap
+
 
 """
     _z_index(extent::Extent, res::NamedTuple, crs::WebMercator) => Int
