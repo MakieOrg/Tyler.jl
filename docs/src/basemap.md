@@ -33,6 +33,7 @@ xs, ys, img = basemap(
 ````
 
 ````@example coverlondon
+using Makie
 image(xs, ys, img; axis = (; aspect = DataAspect()))
 ````
 
@@ -42,7 +43,7 @@ Note that the image is in the Web Mercator projection, as are the axes we see he
 
 ````@example nasagibs
 const BACKEND = Makie.current_backend() # hide
-using Tyler, TileProviders, GeoMakie, CairoMakie
+using Tyler, TileProviders, GeoMakie, CairoMakie, Makie
 
 provider = TileProviders.NASAGIBS(:ViirsEarthAtNight2012)
 
@@ -66,7 +67,7 @@ BACKEND.activate!() # hide
 ### OpenSnowMap on polar stereographic projection
 
 ````@example opensnowmap
-using Tyler, GeoMakie
+using Tyler, GeoMakie, Makie
 
 meshimage(
     basemap(
