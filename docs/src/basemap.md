@@ -24,6 +24,7 @@ Below are some cool examples of using basemaps.
 
 ````@example coverlondon
 using Tyler, TileProviders
+using Tyler.Extents
 
 xs, ys, img = basemap(
     TileProviders.OpenStreetMap(),
@@ -42,8 +43,9 @@ Note that the image is in the Web Mercator projection, as are the axes we see he
 #### NASA GIBS tileset, plotted as a `meshimage` on a `GeoAxis`
 
 ````@example nasagibs
-const BACKEND = Makie.current_backend() # hide
 using Tyler, TileProviders, GeoMakie, CairoMakie, Makie
+using Tyler.Extents
+const BACKEND = Makie.current_backend() # hide
 
 provider = TileProviders.NASAGIBS(:ViirsEarthAtNight2012)
 
@@ -65,7 +67,8 @@ BACKEND.activate!() # hide
 ### OpenSnowMap on polar stereographic projection
 
 ````@example opensnowmap
-using Tyler, TileProviders, GeoMakie, Makie
+using Tyler, TileProviders, GeoMakie, GLMakie
+using Tyler.Extents
 
 meshimage(
     basemap(
