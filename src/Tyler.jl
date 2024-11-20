@@ -47,6 +47,6 @@ include("tile-fetching.jl")
 include("provider/interpolations.jl")
 include("provider/elevation/elevation-provider.jl")
 include("provider/pointclouds/geotiles-pointcloud-provider.jl")
-
+include("basemap.jl")
 
 end
