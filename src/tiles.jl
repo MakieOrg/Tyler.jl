@@ -108,6 +108,12 @@ function load_tile_data(::AbstractProvider, downloaded::AbstractVector{UInt8})
     return FileIO.load(format) # this works because we have ImageIO loaded
 end
 
+function load_tile_data(::AbstractProvider, downloaded::String)
+    io = IOBuffer(read(downloaded))
+    format = FileIO.query(io)  # this interrogates the magic bits to see what file format it is (JPEG, PNG, etc)
+    return FileIO.load(format) # this works because we have ImageIO loaded
+end
+
 function Base.wait(tiles::TileCache; timeout=50)
     # wait for all tiles to get downloaded
     items = lock(tiles.tile_queue) do
