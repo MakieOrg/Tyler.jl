@@ -27,6 +27,9 @@ Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 ThreadSafeDicts = "4239201d-c60e-5e0a-9702-85d713665ba7"
 TileProviders = "263fe934-28e1-4ae9-998a-c2629c5fede6"
 
+[weakdeps]
+GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
+
 [compat]
 ArchGDAL = "0.10"
 Colors = "0.12, 0.13"
@@ -35,6 +38,7 @@ Extents = "0.1.2"
 FileIO = "1"
 GeoFormatTypes = "0.4"
 GeoInterface = "1"
+GeoMakie = "0.7.9"
 GeometryBasics = "0.4, 0.5"
 GeometryOps = "0.1"
 HTTP = "1"
