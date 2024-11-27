@@ -44,6 +44,8 @@ function unique_filename(url)
     return string(hash(url))
 end
 
+file_ending(provider::TileProviders.Provider) = ".some_unknown_image_format"
+
 function download_tile_data(dl::PathDownloader, provider::AbstractProvider, url)
     unique_name = unique_filename(url)
     path = joinpath(dl.cache_dir, unique_name * file_ending(provider))
