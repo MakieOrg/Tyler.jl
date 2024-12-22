@@ -30,6 +30,9 @@ TileProviders = "263fe934-28e1-4ae9-998a-c2629c5fede6"
 [weakdeps]
 GeoMakie = "db073c08-6b98-4ee5-b6a4-5efafb3259c6"
 
+[extensions]
+TylerGeoMakieExt = ["GeoMakie"]
+
 [compat]
 ArchGDAL = "0.10"
 Colors = "0.12, 0.13"
