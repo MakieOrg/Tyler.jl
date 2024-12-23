@@ -47,7 +47,7 @@ end
 
 @testset "Pass GridPosition to figure kwarg" begin
     f = Figure()
-    m = @test_nowarn Tyler.Map(b, provider = OpenStreetMap(), figure = f[1, 2])
+    m = @test_nowarn Tyler.Map(b, figure = f[1, 2])
     @test only(contents(m.figure.layout[1, 2])) isa Axis
 end
 
