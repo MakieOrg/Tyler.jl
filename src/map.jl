@@ -95,7 +95,7 @@ function setup_figure_and_axis!(figure::GridPosition, axis, ext_target, crs)
     """)
 end
 
-function setup_figure_and_axis!(gridposition::GridPosition, axis::NamedTuple, ext_target, crs)
+function setup_figure_and_axis!(gridposition::GridPosition, axis_kws_nt::NamedTuple, ext_target, crs)
     figure = _get_parent_figure(gridposition)
 
     axis_kws = Dict(pairs(axis_kws_nt))
@@ -173,7 +173,7 @@ end
 function Map(extent, extent_crs=wgs84;
     size=(1000, 1000),
     figure=Makie.Figure(; size=size),
-    axis=Makie.Axis(figure[1, 1]; aspect=Makie.DataAspect()),
+    axis=(; type = Axis, aspect = DataAspect()),
     plot_config=PlotConfig(),
     provider=TileProviders.OpenStreetMap(:Mapnik),
     crs=MapTiles.web_mercator,
