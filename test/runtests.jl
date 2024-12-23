@@ -38,6 +38,19 @@ display(m)
     @test GeoInterface.crs(m) == Tyler.MapTiles.WebMercator()
 end
 
+@testset "NamedTuple axis syntax" begin
+    b = Rect2f(-20.0, -20.0, 40.0, 40.0)
+    m = @test_nowarn Tyler.Map(b, provider=OpenStreetMap(), axis = (; type = Axis, aspect = AxisAspect(1)))
+    @test only(contents(m.figure.layout[1, 1])) isa Axis
+    @test only(contents(m.figure.layout[1, 1])).aspect == AxisAspect(1)
+end
+
+@testset "Pass GridPosition to figure kwarg" begin
+    f = Figure()
+    m = @test_nowarn Tyler.Map(b, provider = OpenStreetMap(), figure = f[1, 2])
+    @test only(contents(m.figure.layout[1, 2])) isa Axis
+end
+
 # Reference tests?
 # provider = TileProviders.NASAGIBS()
 # m = Tyler.Map(Rect2f(0, 50, 40, 20), 5; provider=provider, min_tiles=8, max_tiles=32)
