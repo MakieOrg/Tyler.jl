@@ -33,7 +33,9 @@ function update_tiles!(m::Map, arealike)
     tiles = get_tiles_for_area(m, m.fetching_scheme, arealike)
     if length(tiles.foreground) > m.max_plots
         @warn "Too many tiles to plot, which means zoom level is not supported. Plotting no tiles for this zoomlevel." maxlog = 1
-        tiles.foreground = OrderedSet{Tile}()
+        empty!(tiles.foreground)
+        empty!(tiles.background)
+        empty!(tiles.offscreen)
     end
     queued_or_plotted = values(m.should_get_plotted)
     # Queue tiles to be downloaded & displayed
