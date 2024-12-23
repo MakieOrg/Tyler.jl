@@ -14,24 +14,24 @@ When layering providers over each other with `Map(map::Map; ...)`, you can use `
 
 # Arguments
 
--`extent`: the initial extent of the map, as a `GeometryBasics.Rect`
+- `extent`: the initial extent of the map, as a `GeometryBasics.Rect`
     or an `Extents.Extent` in the projection of `extent_crs`.
--`extent_crs`: Any `GeoFormatTypes` compatible crs, the default is wsg84.
+- `extent_crs`: Any `GeoFormatTypes` compatible crs, the default is wsg84.
 
 # Keywords
 
--`size`: The figure size.
--`figure`: an existing `Makie.Figure` object.
--`crs`: The providers coordinate reference system.
--`provider`: a TileProviders.jl `Provider`.
--`max_parallel_downloads`: limits the attempted simultaneous downloads, with a default of `16`.
--`cache_size_gb`: limits the cache for storing tiles, with a default of `5`.
--`fetching_scheme=Halo2DTiling()`: The tile fetching scheme. Can be SimpleTiling(), Halo2DTiling(), or Tiling3D().
--`scale`: a tile scaling factor. Low number decrease the downloads but reduce the resolution.
+- `size`: The figure size.
+- `figure`: an existing `Makie.Figure` object.
+- `crs`: The providers coordinate reference system.
+- `provider`: a TileProviders.jl `Provider`.
+- `max_parallel_downloads`: limits the attempted simultaneous downloads, with a default of `16`.
+- `cache_size_gb`: limits the cache for storing tiles, with a default of `5`.
+- `fetching_scheme=Halo2DTiling()`: The tile fetching scheme. Can be SimpleTiling(), Halo2DTiling(), or Tiling3D().
+- `scale`: a tile scaling factor. Low number decrease the downloads but reduce the resolution.
     The default is `0.5`.
--`plot_config`: A `PlotConfig` object to change the way tiles are plotted.
--`max_zoom`: The maximum zoom level to display, with a default of `TileProviders.max_zoom(provider)`.
--`max_plots=400:` The maximum number of plots to keep displayed at the same time.
+- `plot_config`: A `PlotConfig` object to change the way tiles are plotted.
+- `max_zoom`: The maximum zoom level to display, with a default of `TileProviders.max_zoom(provider)`.
+- `max_plots=400:` The maximum number of plots to keep displayed at the same time.
 """
 struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     provider::AbstractProvider
