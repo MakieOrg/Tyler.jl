@@ -147,6 +147,7 @@ function get_tiles_for_area(m::Map{Axis}, scheme::Halo2DTiling, area::Union{Rect
         halo_grid = MapTiles.TileGrid(halo_area, z, m.crs)
         # Remove tiles inside the area grid
         halo_tiles = setdiff(halo_grid, area_grid)
+        # Update the offscreen tiles set
         union!(offscreen, halo_tiles)
     end
     tiles = (; foreground, background, offscreen)
