@@ -86,15 +86,15 @@ function filter_overlapping!(m::Map, bounds::Rect3, tile, key)
         other_bounds2d = Rect2d(other_bounds)
         # If overlap
         if bounds2d in other_bounds2d || other_bounds2d in bounds2d
-            if haskey(m.current_tiles, tile)
+            if haskey(m.foreground_tiles, tile)
                 # the new plot has priority since it's in the newest current tile set
                 remove_plot!(m, other_key)
-            elseif haskey(m.current_tiles, other_tile)
+            elseif haskey(m.foreground_tiles, other_tile)
                 delete!(m.should_get_plotted, key)
                 # the existing plot has priority so we skip the new plot
                 return true
             else
-                # If both are not in current_tiles, we remove the plot farthest away from the current zoom level
+                # If both are not in foreground_tiles, we remove the plot farthest away from the current zoom level
                 if abs(tile.z - m.zoom[]) <= abs(other_tile.z - m.zoom[])
                     remove_plot!(m, other_key)
                 else
@@ -111,7 +111,7 @@ function cull_plots!(m::Map)
     if length(m.plots) >= (m.max_plots - 1)
         # remove the oldest plot
         p_tiles = plotted_tiles(m)
-        available_to_remove = setdiff(p_tiles, keys(m.current_tiles))
+        available_to_remove = setdiff(p_tiles, keys(m.foreground_tiles))
         sort!(available_to_remove, by=tile -> abs(tile.z - m.zoom[]))
         n_avail = length(available_to_remove)
         need_to_remove = min(n_avail, length(m.plots) - m.max_plots)
@@ -154,7 +154,7 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
         update_tile_plot!(mplot, cfg, m.axis, data_processed, bounds, (tile, m.crs))
     end
 
-    if haskey(m.current_tiles, tile)
+    if haskey(m.foreground_tiles, tile)
         move_in_front!(mplot, abs(m.zoom[] - tile.z), bounds)
     else
         move_to_back!(mplot, abs(m.zoom[] - tile.z), bounds)

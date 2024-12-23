@@ -87,10 +87,8 @@ begin
     m2 = Tyler.Map3D(ext; provider=ElevationProvider(), figure=m1.figure, axis=m1.axis, max_parallel_downloads=1, plot_config=cfg)
     m1
 end
-max_zoom(m1)
-Tyler.approx_tiles(m1, , 1000)
 
-m1.current_tiles
+m1.foreground_tiles
 m1.tiles.tile_queue
 m1.plots
 m1.should_get_plotted

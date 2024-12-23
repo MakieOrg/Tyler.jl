@@ -41,7 +41,7 @@ struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     # The tile downloader + cacher
     tiles::TileCache
     # The tiles for the current zoom level - we may plot many more than this
-    current_tiles::ThreadSafeDict{Tile,Bool}
+    foreground_tiles::ThreadSafeDict{Tile,Bool}
     # The plots we have created but are not currently visible and can be reused
     unused_plots::Vector{Makie.Plot}
     # All tile plots we're currently plotting
@@ -113,7 +113,7 @@ toggle_visibility!(m::Map) = m.axis.scene.visible[] = !m.axis.scene.visible[]
 
 function Base.close(m::Map)
     cleanup_queue!(m, OrderedSet{Tile}())
-    empty!(m.current_tiles)
+    empty!(m.foreground_tiles)
     empty!(m.unused_plots)
     empty!(m.plots)
     empty!(m.should_get_plotted)
@@ -128,7 +128,7 @@ function Map(extent, extent_crs=wgs84;
     provider=TileProviders.OpenStreetMap(:Mapnik),
     crs=MapTiles.web_mercator,
     cache_size_gb=5,
-    max_parallel_downloads=1,
+    max_parallel_downloads=10,
     fetching_scheme=Halo2DTiling(),
     max_zoom=TileProviders.max_zoom(provider),
     max_plots=400,
@@ -148,7 +148,7 @@ function Map(extent, extent_crs=wgs84;
 
     plots = ThreadSafeDict{String,Tuple{Makie.Plot,Tile,Rect}}()
     should_get_plotted = ThreadSafeDict{String,Tile}()
-    current_tiles = ThreadSafeDict{Tile,Bool}()
+    foreground_tiles = ThreadSafeDict{Tile,Bool}()
     unused_plots = Makie.Plot[]
     display_task = Base.RefValue{Task}()
 
@@ -157,7 +157,7 @@ function Map(extent, extent_crs=wgs84;
         axis,
         plot_config,
         tiles,
-        current_tiles,
+        foreground_tiles,
         unused_plots,
         plots,
         should_get_plotted,
@@ -207,7 +207,7 @@ function Base.wait(m::AbstractMap; timeout=50)
     wait(m.tiles; timeout=timeout)
     start = time()
     while true
-        tile_keys = Set(tile_key.((m.provider,), keys(m.current_tiles)))
+        tile_keys = Set(tile_key.((m.provider,), keys(m.foreground_tiles)))
         if all(k -> haskey(m.plots, k), tile_keys)
             break
         end
