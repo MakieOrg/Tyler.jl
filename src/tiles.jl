@@ -34,8 +34,6 @@ end
 function run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
     while isopen(tile_queue) || isready(tile_queue)
         tile = take_last!(tile_queue) # priorize newly arrived tiles
-        @show (tile.x, tile.y, tile.z)
-        #sleep()
         result = nothing
         try
             @debug("downloading tile on thread $(Threads.threadid())")
@@ -82,7 +80,6 @@ function TileCache(provider; cache_size_gb=5, max_parallel_downloads=1)
     tile_queue = Channel{Tile}(Inf)
 
     async = Threads.nthreads(:default) <= 1
-    async = true # TODO remove 
     if async && max_parallel_downloads > 1
         @warn "Multiple download threads are not supported with Threads.nthreads()==1, falling back to async. Start Julia with more threads for parallel downloads."
         async = true
