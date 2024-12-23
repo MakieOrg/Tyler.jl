@@ -58,6 +58,56 @@ struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     scale::Float64
 end
 
+function setup_figure_and_axis!(figure::Makie.Figure, axis, ext_target, crs)
+    setup_axis!(axis, ext_target, crs)
+    return figure, axis
+end
+
+function setup_figure_and_axis!(figure::Makie.Figure, axis_kws_nt::NamedTuple, ext_target, crs)
+    axis_kws = Dict(pairs(axis_kws_nt))
+    AxisType = pop!(axis_kws, :type, Axis)
+
+    axis = AxisType(figure[1, 1]; axis_kws...)
+
+    setup_axis!(axis, ext_target, crs)
+
+    return figure, axis
+end
+
+_get_parent_layout(gp::Makie.GridPosition) = _get_parent_layout(gp.layout)
+_get_parent_layout(gp::Makie.GridSubposition) = _get_parent_layout(gp.layout)
+_get_parent_layout(gl::Makie.GridLayout) = gl
+
+
+_get_parent_figure(fig::Makie.Figure) = fig
+_get_parent_figure(gl::Makie.GridLayout) = _get_parent_figure(gl.parent)
+_get_parent_figure(gp::Makie.GridPosition) = _get_parent_figure(_get_parent_layout(gp.layout))
+_get_parent_figure(gp::Makie.GridSubposition) = _get_parent_figure(_get_parent_layout(gp.layout))
+
+function setup_figure_and_axis!(figure::GridPosition, axis, ext_target, crs)
+    error("""
+    You have tried to construct a `Map` at a given grid position, 
+    but with a materialized axis of type $(typeof(axis)).  
+    
+    You can only do this if you let Tyler construct the axis, 
+    by passing its parameters as a NamedTuple 
+    (like `axis = (; type = Axis, ...)`).
+    """)
+end
+
+function setup_figure_and_axis!(gridposition::GridPosition, axis::NamedTuple, ext_target, crs)
+    figure = _get_parent_figure(gridposition)
+
+    axis_kws = Dict(pairs(axis_kws_nt))
+    AxisType = pop!(axis_kws, :type, Axis)
+
+    axis = AxisType(gridposition; axis_kws...)
+
+    setup_axis!(axis, ext_target, crs)
+
+    return figure, axis
+end
+
 setup_axis!(::Makie.AbstractAxis, ext_target, crs) = nothing
 
 function setup_axis!(axis::Axis, ext_target, crs)
@@ -140,7 +190,7 @@ function Map(extent, extent_crs=wgs84;
     if !isnothing(extent) && !isnothing(extent_crs)
         extent isa Extent || (extent = Extents.extent(extent))
         ext_target = MapTiles.project_extent(extent, extent_crs, crs)
-        setup_axis!(axis, ext_target, crs)
+        figure, axis = setup_figure_and_axis!(figure, axis, ext_target, crs)
     end
 
     tiles = TileCache(provider; cache_size_gb=cache_size_gb, max_parallel_downloads=max_parallel_downloads)
