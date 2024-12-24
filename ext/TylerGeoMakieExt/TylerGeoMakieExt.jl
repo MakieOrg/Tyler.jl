@@ -8,7 +8,7 @@ import Tyler: tile_reloader, create_tileplot!, update_tile_plot!,
             Map, AbstractMap, ImageData, PlotConfig, DebugPlotConfig,
             SimpleTiling, Halo2DTiling
 
-using Tyler: to_rect
+using Tyler: to_rect, grow_extent, OrderedSet, optimal_zoom, min_zoom, max_zoom
 
 
 using Makie, Makie.GeometryBasics

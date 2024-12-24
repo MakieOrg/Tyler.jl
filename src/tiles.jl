@@ -78,6 +78,7 @@ function TileCache(provider; cache_size_gb=5, max_parallel_downloads=1)
     fetched_tiles = LRU{String,Union{Nothing, TileFormat}}(; maxsize=cache_size_gb * 10^9, by=Base.summarysize)
     downloaded_tiles = Channel{Tuple{Tile,Union{Nothing, TileFormat}}}(Inf)
     tile_queue = Channel{Tile}(Inf)
+
     async = Threads.nthreads(:default) <= 1
     if async && max_parallel_downloads > 1
         @warn "Multiple download threads are not supported with Threads.nthreads()==1, falling back to async. Start Julia with more threads for parallel downloads."

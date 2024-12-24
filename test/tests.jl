@@ -7,6 +7,6 @@ begin
     provider = GeoTilePointCloudProvider(subset=subset)
     m1 = Tyler.Map3D(ext; provider=provider)
     wait(m1)
-    unique_plots = unique(Tyler.tile_key.((m1.provider,), keys(m1.current_tiles)))
+    unique_plots = unique(Tyler.tile_key.((m1.provider,), keys(m1.foreground_tiles)))
     @test length(unique_plots) == length(m1.plots)
 end
