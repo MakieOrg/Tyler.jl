@@ -46,6 +46,7 @@ end
 end
 
 @testset "Pass GridPosition to figure kwarg" begin
+    b = Rect2f(-20.0, -20.0, 40.0, 40.0)
     f = Figure()
     m = @test_nowarn Tyler.Map(b, figure = f[1, 2])
     @test only(contents(m.figure.layout[1, 2])) isa Axis
