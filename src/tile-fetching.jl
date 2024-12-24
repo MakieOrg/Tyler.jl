@@ -30,54 +30,57 @@ end
 
 function update_tiles!(m::Map, arealike)
     # Get the tiles to be plotted from the fetching scheme and arealike
-    new_tiles_set, background_tiles = get_tiles_for_area(m, m.fetching_scheme, arealike)
-    if length(new_tiles_set) > m.max_plots
+    tiles = get_tiles_for_area(m, m.fetching_scheme, arealike)
+    if length(tiles.foreground) > m.max_plots
         @warn "Too many tiles to plot, which means zoom level is not supported. Plotting no tiles for this zoomlevel." maxlog = 1
-        new_tiles_set = OrderedSet{Tile}()
-        background_tiles = OrderedSet{Tile}()
+        empty!(tiles.foreground)
+        empty!(tiles.background)
+        empty!(tiles.offscreen)
     end
     queued_or_plotted = values(m.should_get_plotted)
-    to_add = setdiff(new_tiles_set, queued_or_plotted)
+    # Queue tiles to be downloaded & displayed
+    to_add = map(t -> setdiff(t, queued_or_plotted), tiles)
 
-    # We don't add any background tile to the current_tiles, so they stay shifted to the back
-    # They get added async, so at this point `to_add` won't be in currently_plotted yet
-    will_be_plotted = union(new_tiles_set, queued_or_plotted)
     # replace
-    empty!(m.current_tiles)
-    for tile in new_tiles_set
-        m.current_tiles[tile] = true
+    empty!(m.foreground_tiles)
+    for tile in tiles.foreground
+        m.foreground_tiles[tile] = true
     end
 
     # Move all plots to the back, that aren't in the newest tileset anymore
     for (key, (plot, tile, bounds)) in m.plots
         dist = abs(m.zoom[] - tile.z)
-        if haskey(m.current_tiles, tile)
+        if haskey(m.foreground_tiles, tile)
             move_in_front!(plot, dist, bounds)
         else
             move_to_back!(plot, dist, bounds)
         end
     end
 
-    # Queue tiles to be downloaded & displayed
-    to_add_background = setdiff(background_tiles, will_be_plotted)
     # Remove any item from queue, that isn't in the new set
-    to_keep = union(background_tiles, will_be_plotted)
+    to_keep_queued = union(tiles...)
     # Remove all tiles that are not in the new set from the queue
-    cleanup_queue!(m, to_keep)
+    cleanup_queue!(m, to_keep_queued)
 
     # The unique is needed to avoid tiles referencing the same tile
     # TODO, we should really consider to disallow this for tile providers,
     # This is currently only allowed because of the PointCloudProvider
-    background = unique(t -> tile_key(m.provider, t), to_add_background)
-    foreground = unique(t -> tile_key(m.provider, t), to_add)
+    to_add_keys = map(to_add) do ta
+        unique(t -> tile_key(m.provider, t), ta)
+    end
 
     # We lock the queue, to put all tiles in one go into the tile queue
-    # Since download workers take the last tiles first, foreground tiles go last
-    # Without the lock, a few (n_download_threads) background tiles would be downloaded first,
-    # since they will be the last in the queue until we add the foreground tiles
+    # Without the lock, a few (n_download_threads) old tiles will be downloaded first
+    # since they will be the last in the queue until we add the new tiles
     lock(m.tiles.tile_queue) do
-        foreach(tile -> queue_plot!(m, tile), background)
-        foreach(tile -> queue_plot!(m, tile), foreground)
+        # Offscreen tiles show last, so scroll and zoom don't show
+        # empty white areas or low resolution tiles
+        foreach(tile -> queue_plot!(m, tile), to_add_keys.offscreen)
+        # Foreground tiles show in the middle, filling out details
+        foreach(tile -> queue_plot!(m, tile), to_add_keys.foreground)
+        # Lower-resolution background tiles show first
+        # Its quick to get them and they immediately fill the plot
+        foreach(tile -> queue_plot!(m, tile), to_add_keys.background)
     end
 end
 
@@ -107,34 +110,50 @@ function get_tiles_for_area(m::Map{Axis}, scheme::Halo2DTiling, area::Union{Rect
     layer_range = max(min_zoom(m), zoom - depth):zoom
     # Get the tiles around the mouse first
     xpos, ypos = Makie.mouseposition(m.axis.scene)
+    # Use the closest in-bounds point
+    xpos = max(min(xpos, area.X[2]), area.X[1])
+    ypos = max(min(ypos, area.Y[2]), area.Y[1])
+    # Define a 1% resolution extent around the mouse
     xspan = (area.X[2] - area.X[1]) * 0.01
     yspan = (area.Y[2] - area.Y[1]) * 0.01
     mouse_area = Extents.Extent(; X=(xpos - xspan, xpos + xspan), Y=(ypos - yspan, ypos + yspan))
-    # Make a halo around the mouse tile to load next, intersecting area so we don't download outside the plot
-    mouse_halo_area = grow_extent(mouse_area, 10)
     # Define a halo around the area to download last, so pan/zoom are filled already
     halo_area = grow_extent(area, scheme.halo) # We don't mind that the middle tiles are the same, the OrderedSet will remove them
-    # Define all the tiles in the order they will load in
-    background_areas = if Extents.intersects(mouse_halo_area, area)
-        mha = Extents.intersection(mouse_halo_area, area)
-        if Extents.intersects(mouse_area, area)
-            [Extents.intersection(mouse_area, area), mha, halo_area]
-        else
-            [mha, halo_area]
-        end
-    else
-        [halo_area]
-    end
 
-    foreground = OrderedSet{Tile}(MapTiles.TileGrid(area, zoom, m.crs))
+    # Set up empty tile lists
+    foreground = OrderedSet{Tile}()
     background = OrderedSet{Tile}()
+    offscreen = OrderedSet{Tile}()
+    # Fill tiles for each z layer
     for z in layer_range
-        z == zoom && continue
-        for ext in background_areas
-            union!(background, MapTiles.TileGrid(ext, z, m.crs))
+        # Get rings of tiles around the mouse, intersecting 
+        # area so we don't get tiles outside the plot
+        for ext_scale in 1:4:100
+            # Get an extent
+            mouse_halo_area = grow_extent(mouse_area, ext_scale)
+            # Check if it intersects the plot area
+            ext = Extents.intersection(mouse_halo_area, area)
+            # No intersection so continue
+            isnothing(ext) && continue
+            tilegrid = MapTiles.TileGrid(ext, z, m.crs)
+            if z == zoom
+                union!(foreground, tilegrid)
+            else
+                union!(background, tilegrid)
+            end
         end
+        # Get the halo ring tiles to load offscreen
+        area_grid = MapTiles.TileGrid(area, z, m.crs)
+        halo_grid = MapTiles.TileGrid(halo_area, z, m.crs)
+        # Remove tiles inside the area grid
+        halo_tiles = setdiff(halo_grid, area_grid)
+        # Update the offscreen tiles set
+        union!(offscreen, halo_tiles)
     end
-    return foreground, background
+    tiles = (; foreground, background, offscreen)
+    # Reverse the order of the groups. Reversing the ranges 
+    # above doesn't have the same effect due to then unions
+    return map(OrderedSet ∘ reverse ∘ collect, tiles)
 end
 
 #########################################################################################
@@ -149,7 +168,10 @@ function get_tiles_for_area(m::Map, ::SimpleTiling, area::Union{Rect,Extent})
     # Calculate the zoom level
     ideal_zoom, zoom, approx_ntiles = optimal_zoom(m, diag)
     m.zoom[] = zoom
-    return OrderedSet{Tile}(MapTiles.TileGrid(area, zoom, m.crs)), OrderedSet{Tile}()
+    foreground = OrderedSet{Tile}(MapTiles.TileGrid(area, zoom, m.crs))
+    background = OrderedSet{Tile}()
+    offscreen = OrderedSet{Tile}()
+    return (; foreground, background, offscreen)
 end
 
 #########################################################################################
@@ -165,9 +187,11 @@ function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camer
     camc.far[] = maxdist
     camc.near[] = eyepos[3] * 0.01
     update_cam!(m.axis.scene)
-    return tiles_from_poly(m, points), OrderedSet{Tile}()
+    foreground = tiles_from_poly(m, points)
+    background = OrderedSet{Tile}()
+    offscreen = OrderedSet{Tile}()
+    return (; foreground, background, offscreen)
 end
-
 function get_tiles_for_area(m::Map{LScene}, s::SimpleTiling, (cam, camc)::Tuple{Camera,Camera3D})
     area = area_around_lookat(camc)
     return get_tiles_for_area(m, s, area)
