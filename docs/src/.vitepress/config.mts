@@ -52,6 +52,7 @@ export default defineConfig({
                         text: "Map3D",
                         link: "/map-3d",
                     },
+                    { text: 'Base maps', link: '/basemap' }
                 ],
             },
 
