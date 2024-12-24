@@ -7,7 +7,7 @@ using GeometryBasics: GeometryBasics, GLTriangleFace, Point2f, Vec2f, Rect2f, Re
 using HTTP: HTTP
 using LRUCache: LRUCache, LRU
 using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
-using Makie: Makie, Observable, Figure, Axis, LScene, RGBAf, on, isopen, meta, mesh!, translate!, scale!, Plot
+using Makie: Makie, Observable, Figure, Axis, LScene, RGBAf, on, isopen, mesh!, translate!, scale!, Plot
 using OrderedCollections: OrderedCollections, OrderedSet
 using ThreadSafeDicts: ThreadSafeDicts, ThreadSafeDict
 using TileProviders: TileProviders, AbstractProvider, geturl, min_zoom, max_zoom
