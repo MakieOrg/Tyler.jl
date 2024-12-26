@@ -37,15 +37,15 @@ display(m)
     @test Extents.extent(m) isa Extents.Extent
     @test GeoInterface.crs(m) == Tyler.MapTiles.WebMercator()
 end
-#=
+
 @testset "NamedTuple axis syntax" begin
     b = Rect2f(-20.0, -20.0, 40.0, 40.0)
     m1 = @test_nowarn Tyler.Map(b, provider=Tyler.TileProviders.OpenStreetMap(), axis = (; type = Axis, aspect = AxisAspect(1)))
     @test only(contents(m1.figure.layout[1, 1])) isa Axis
     @test only(contents(m1.figure.layout[1, 1])).aspect[] == AxisAspect(1)
-    close(m1)
+    # close(m1)
 end
-
+#=
 @testset "Pass GridPosition to figure kwarg" begin
     b = Rect2f(-20.0, -20.0, 40.0, 40.0)
     f = Figure()
