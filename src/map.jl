@@ -1,9 +1,3 @@
-
-function tile_key(provider::AbstractProvider, tile::Tile)
-    return TileProviders.geturl(provider, tile.x, tile.y, tile.z)
-end
-
-
 """
     Map(extent, [extent_crs=wgs84]; kw...)
     Map(map::Map; ...) # layering another provider on top of an existing map
@@ -57,81 +51,6 @@ struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     max_plots::Int
     scale::Float64
 end
-
-function setup_figure_and_axis!(figure::Makie.Figure, axis, ext_target, crs)
-    setup_axis!(axis, ext_target, crs)
-    return figure, axis
-end
-
-function setup_figure_and_axis!(figure::Makie.Figure, axis_kws_nt::NamedTuple, ext_target, crs)
-    axis_kws = Dict(pairs(axis_kws_nt))
-    AxisType = pop!(axis_kws, :type, Axis)
-
-    axis = AxisType(figure[1, 1]; axis_kws...)
-
-    setup_axis!(axis, ext_target, crs)
-
-    return figure, axis
-end
-
-_get_parent_layout(gp::Makie.GridPosition) = _get_parent_layout(gp.layout)
-_get_parent_layout(gp::Makie.GridSubposition) = _get_parent_layout(gp.layout)
-_get_parent_layout(gl::Makie.GridLayout) = gl
-
-
-_get_parent_figure(fig::Makie.Figure) = fig
-_get_parent_figure(gl::Makie.GridLayout) = _get_parent_figure(gl.parent)
-_get_parent_figure(gp::Makie.GridPosition) = _get_parent_figure(_get_parent_layout(gp.layout))
-_get_parent_figure(gp::Makie.GridSubposition) = _get_parent_figure(_get_parent_layout(gp.layout))
-
-function setup_figure_and_axis!(figure::GridPosition, axis, ext_target, crs)
-    error("""
-    You have tried to construct a `Map` at a given grid position, 
-    but with a materialized axis of type $(typeof(axis)).  
-    
-    You can only do this if you let Tyler construct the axis, 
-    by passing its parameters as a NamedTuple 
-    (like `axis = (; type = Axis, ...)`).
-    """)
-end
-
-function setup_figure_and_axis!(gridposition::GridPosition, axis_kws_nt::NamedTuple, ext_target, crs)
-    figure = _get_parent_figure(gridposition)
-
-    axis_kws = Dict(pairs(axis_kws_nt))
-    AxisType = pop!(axis_kws, :type, Axis)
-
-    axis = AxisType(gridposition; axis_kws...)
-
-    setup_axis!(axis, ext_target, crs)
-
-    return figure, axis
-end
-
-setup_axis!(::Makie.AbstractAxis, ext_target, crs) = nothing
-
-function setup_axis!(axis::Axis, ext_target, crs)
-    X = ext_target.X
-    Y = ext_target.Y
-    axis.autolimitaspect = 1
-    Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
-    axis.elements[:background].depth_shift[] = 0.1f0
-    translate!(axis.elements[:background], 0, 0, -1000)
-    axis.elements[:background].color = :transparent
-    axis.xgridvisible = false
-    axis.ygridvisible = false
-    return
-end
-
-function Map3D(m::Map; kw...)
-    ax = m.axis
-    # Make a copy of the lscene, so we can easier separate the plots.
-    ax2 = LScene(ax.parent, ax.layoutobservables, ax.blockscene)
-    ax2.scene = Scene(ax.scene; camera=ax.scene.camera, camera_controls=ax.scene.camera_controls)
-    return Map3D(nothing, nothing; figure=m.figure, axis=ax2, kw...)
-end
-
-
 """
     Map(m::Map; kw...)
 Layering constructor to show another provider on top of an existing map.
@@ -158,18 +77,6 @@ function Map(m::Map; kw...)
     setfield!(ax2.scene, :float32convert, ax.scene.float32convert)
     return Map(nothing, nothing; figure=m.figure, axis=ax2, kw...)
 end
-
-toggle_visibility!(m::Map) = m.axis.scene.visible[] = !m.axis.scene.visible[]
-
-function Base.close(m::Map)
-    cleanup_queue!(m, OrderedSet{Tile}())
-    empty!(m.foreground_tiles)
-    empty!(m.unused_plots)
-    empty!(m.plots)
-    empty!(m.should_get_plotted)
-    close(m.tiles)
-end
-
 function Map(extent, extent_crs=wgs84;
     size=(1000, 1000),
     figure=Makie.Figure(; size=size),
@@ -247,6 +154,124 @@ function Map(extent, extent_crs=wgs84;
     return map
 end
 
+function setup_figure_and_axis!(figure::Makie.Figure, axis, ext_target, crs)
+    setup_axis!(axis, ext_target, crs)
+    return figure, axis
+end
+function setup_figure_and_axis!(figure::Makie.Figure, axis_kws_nt::NamedTuple, ext_target, crs)
+    axis_kws = Dict(pairs(axis_kws_nt))
+    AxisType = pop!(axis_kws, :type, Axis)
+
+    axis = AxisType(figure[1, 1]; axis_kws...)
+
+    setup_axis!(axis, ext_target, crs)
+
+    return figure, axis
+end
+function setup_figure_and_axis!(figure::GridPosition, axis, ext_target, crs)
+    error("""
+    You have tried to construct a `Map` at a given grid position, 
+    but with a materialized axis of type $(typeof(axis)).  
+    
+    You can only do this if you let Tyler construct the axis, 
+    by passing its parameters as a NamedTuple 
+    (like `axis = (; type = Axis, ...)`).
+    """)
+end
+function setup_figure_and_axis!(gridposition::GridPosition, axis_kws_nt::NamedTuple, ext_target, crs)
+    figure = _get_parent_figure(gridposition)
+
+    axis_kws = Dict(pairs(axis_kws_nt))
+    AxisType = pop!(axis_kws, :type, Axis)
+
+    axis = AxisType(gridposition; axis_kws...)
+
+    setup_axis!(axis, ext_target, crs)
+
+    return figure, axis
+end
+
+_get_parent_layout(gp::Makie.GridPosition) = _get_parent_layout(gp.layout)
+_get_parent_layout(gp::Makie.GridSubposition) = _get_parent_layout(gp.layout)
+_get_parent_layout(gl::Makie.GridLayout) = gl
+
+_get_parent_figure(fig::Makie.Figure) = fig
+_get_parent_figure(gl::Makie.GridLayout) = _get_parent_figure(gl.parent)
+_get_parent_figure(gp::Makie.GridPosition) = _get_parent_figure(_get_parent_layout(gp.layout))
+_get_parent_figure(gp::Makie.GridSubposition) = _get_parent_figure(_get_parent_layout(gp.layout))
+
+setup_axis!(::Makie.AbstractAxis, ext_target, crs) = nothing
+function setup_axis!(axis::Axis, ext_target, crs)
+    X = ext_target.X
+    Y = ext_target.Y
+    axis.autolimitaspect = 1
+    Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
+    axis.elements[:background].depth_shift[] = 0.1f0
+    translate!(axis.elements[:background], 0, 0, -1000)
+    axis.elements[:background].color = :transparent
+    axis.xgridvisible = false
+    axis.ygridvisible = false
+    return
+end
+
+toggle_visibility!(m::Map) = m.axis.scene.visible[] = !m.axis.scene.visible[]
+
+function tile_reloader(map::Map{Axis})
+    axis = map.axis
+    throttled = Makie.Observables.throttle(0.2, axis.finallimits)
+    on(axis.scene, throttled; update=true) do extent
+        update_tiles!(map, extent)
+        return
+    end
+end
+
+function plotted_tiles(m::Map)
+    return getindex.(values(m.plots), 2)
+end
+
+function remove_unused!(m::AbstractMap, tile::Tile)
+    return remove_unused!(m, tile_key(m.provider, tile))
+end
+function remove_unused!(m::AbstractMap, key::String)
+    plot_tile = get(m.plots, key, nothing)
+    if !isnothing(plot_tile)
+        plot, tile, bounds = plot_tile
+        move_to_back!(plot, abs(m.zoom[] - tile.z), bounds)
+        return plot, key
+    end
+    return nothing
+end
+
+# Package interface methods
+
+GeoInterface.crs(map::Map) = map.crs
+Extents.extent(map::Map) = Extents.extent(map.axis.finallimits[])
+
+TileProviders.max_zoom(map::Map) = map.max_zoom
+TileProviders.min_zoom(map::Map) = Int(min_zoom(map.provider))
+
+# Base methods
+
+Base.showable(::MIME"image/png", ::AbstractMap) = true
+
+function Base.show(io::IO, m::MIME"image/png", map::AbstractMap)
+    wait(map)
+    Makie.show(io, m, map.figure.scene)
+end
+
+function Base.display(map::AbstractMap)
+    wait(map)
+    Base.display(map.figure.scene)
+end
+
+function Base.close(m::Map)
+    cleanup_queue!(m, OrderedSet{Tile}())
+    empty!(m.foreground_tiles)
+    empty!(m.unused_plots)
+    empty!(m.plots)
+    empty!(m.should_get_plotted)
+    close(m.tiles)
+end
 function Base.wait(m::AbstractMap; timeout=50)
     # The download + plot loops need a screen to do their work!
     if isnothing(Makie.getscreen(m.figure.scene))
@@ -268,50 +293,4 @@ function Base.wait(m::AbstractMap; timeout=50)
         sleep(0.01)
     end
     return m
-end
-
-function tile_reloader(map::Map{Axis})
-    axis = map.axis
-    throttled = Makie.Observables.throttle(0.2, axis.finallimits)
-    on(axis.scene, throttled; update=true) do extent
-        update_tiles!(map, extent)
-        return
-    end
-end
-
-function plotted_tiles(m::Map)
-    return getindex.(values(m.plots), 2)
-end
-
-GeoInterface.crs(map::Map) = map.crs
-Extents.extent(map::Map) = Extents.extent(map.axis.finallimits[])
-
-TileProviders.max_zoom(map::Map) = map.max_zoom
-TileProviders.min_zoom(map::Map) = Int(min_zoom(map.provider))
-
-Base.showable(::MIME"image/png", ::AbstractMap) = true
-
-function Base.show(io::IO, m::MIME"image/png", map::AbstractMap)
-    wait(map)
-    Makie.show(io, m, map.figure.scene)
-end
-
-function Base.display(map::AbstractMap)
-    wait(map)
-    Base.display(map.figure.scene)
-end
-
-
-function remove_unused!(m::AbstractMap, tile::Tile)
-    return remove_unused!(m, tile_key(m.provider, tile))
-end
-
-function remove_unused!(m::AbstractMap, key::String)
-    plot_tile = get(m.plots, key, nothing)
-    if !isnothing(plot_tile)
-        plot, tile, bounds = plot_tile
-        move_to_back!(plot, abs(m.zoom[] - tile.z), bounds)
-        return plot, key
-    end
-    return nothing
 end
