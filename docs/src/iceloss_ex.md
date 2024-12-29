@@ -1,6 +1,6 @@
 ## Greenland ice loss example: animated & interactive
 
-```@example ice
+````@example ice
 using Tyler
 using Tyler.TileProviders
 using Tyler.Extents
@@ -11,7 +11,7 @@ using DataFrames
 using GLMakie
 using GLMakie.Colors
 GLMakie.activate!()
-```
+````
 
 ::: info
 
@@ -23,38 +23,38 @@ Ice loss from the Greenland Ice Sheet: 1972-2022.
 
 Load ice loss data [courtesy of Chad Greene @ JPL]
 
-```@example ice
+````@example ice
 url = "https://github.com/JuliaGeo/JuliaGeoData/blob/365a09596bfca59e0977c20c2c2f566c0b29dbaa/assets/data/iceloss_subset.arrow?raw=true";
 resp = HTTP.get(url);
 df = DataFrame(Arrow.Table(resp.body));
 first(df, 5)
-```
+````
 select map provider
 
-```@example ice
+````@example ice
 provider = TileProviders.Esri(:WorldImagery);
 nothing # hide
-```
+````
 
 Greenland extent
 
-```@example ice
+````@example ice
 extent = Extent(X = (-54., -48.), Y = (68.8, 72.5));
-```
+````
 extract data
 
-```@example ice
+````@example ice
 cnt = [length(foo) for foo in df.X];
 X =  reduce(vcat,df.X);
 Y =  reduce(vcat,df.Y);
 Z = [repeat([i],c) for (i, c) = enumerate(cnt)];
 Z = reduce(vcat,Z);
 nothing # hide
-```
+````
 
 make a colormap
 
-```@example ice
+````@example ice
 nc = length(Makie.to_colormap(:thermal));
 n = nrow(df);
 alpha = zeros(nc);
@@ -63,25 +63,25 @@ alpha[maximum([1,round(Int64,1*nc/n)])] = 1;
 cmap = Colors.alphacolor.(Makie.to_colormap(:thermal), alpha);
 cmap = Observable(cmap);
 nothing # hide
-```
+````
 show map
 
-```@example ice
+````@example ice
 fig = Figure(; size = (1200,600))
 ax = Axis(fig[1,1])
 m = Tyler.Map(extent; provider, figure=fig, axis=ax)
-```
+````
 
 create initial scatter plot
 
-```@example ice
+````@example ice
 scatter!(ax, X, Y; color = Z, colormap = cmap, colorrange = [0, n], markersize = 10);
 m
-```
+````
 
 add colorbar
 
-```@example ice
+````@example ice
 a,b = extrema(df.Date);
 a = year(a);
 b = year(b);
@@ -92,10 +92,10 @@ hidedecorations!(ax);
 # hide frames
 hidespines!(ax);
 m
-```
+````
 
 loop to create animation
-```julia
+````julia
 for k = 1:15
     # reset apha
     alpha[:] = zeros(nc);
@@ -108,7 +108,7 @@ for k = 1:15
         sleep(0.001);
     end
 end
-```
+````
 
 ```@raw html
 <video src="https://github.com/JuliaGeo/JuliaGeoData/raw/main/assets/videos/iceloss.mp4" controls="controls" autoplay="autoplay" ></video>
