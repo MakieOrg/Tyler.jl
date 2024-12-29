@@ -9,7 +9,6 @@ struct ByteDownloader <: AbstractDownloader
     io::IOBuffer
     bytes::Vector{UInt8}
 end
-
 function ByteDownloader(timeout=3)
     downloader = Downloads.Downloader()
     downloader.easy_hook = (easy, info) -> Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_LOW_SPEED_TIME, timeout)
@@ -31,7 +30,6 @@ struct PathDownloader <: AbstractDownloader
     cache_dir::String
     lru::LRU{String, Int}
 end
-
 function PathDownloader(cache_dir; timeout=5, cache_size_gb=5)
     isdir(cache_dir) || mkpath(cache_dir)
     lru = LRU{String, Int}(maxsize=cache_size_gb * 10^9, by=identity)
@@ -40,15 +38,13 @@ function PathDownloader(cache_dir; timeout=5, cache_size_gb=5)
     return PathDownloader(timeout, downloader, cache_dir, lru)
 end
 
-function unique_filename(url)
-    return string(hash(url))
-end
-
 function download_tile_data(dl::PathDownloader, provider::AbstractProvider, url)
-    unique_name = unique_filename(url)
+    unique_name = _unique_filename(url)
     path = joinpath(dl.cache_dir, unique_name * file_ending(provider))
     if !isfile(path)
         Downloads.download(url, path; downloader=dl.downloader)
     end
     return path
 end
+
+_unique_filename(url) = string(hash(url))

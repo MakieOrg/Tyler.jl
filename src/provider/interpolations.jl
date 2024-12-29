@@ -14,14 +14,15 @@ struct Interpolator{F} <: AbstractProvider
     colormap::Vector{RGBAf}
     options::Dict
 end
-
 Interpolator(f; colormap=:thermal, options=Dict(:minzoom=>1, :maxzoom=>19)) =
     Interpolator(f, Makie.to_colormap(colormap), options)
 
+# TileProviders interface
 function TileProviders.geturl(::Interpolator, x::Integer, y::Integer, z::Integer)
     return "$x,$y,$z"
 end
 
+# Tyler interface
 get_downloader(::Interpolator) = NoDownload()
 
 function fetch_tile(interpolator::Interpolator, ::NoDownload, tile::Tile)
@@ -29,6 +30,7 @@ function fetch_tile(interpolator::Interpolator, ::NoDownload, tile::Tile)
     z = permutedims(interpolator.interpolator.(lon, lat))
     return [_col(interpolator, i) for i in z]
 end
+
 
 # TODO just use Makie plotting for colors,
 # we just need to pass the args throught to it

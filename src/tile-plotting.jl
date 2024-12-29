@@ -47,7 +47,8 @@ extent = Extent(; X=(lon - delta / 2, lon + delta / 2), Y=(lat - delta / 2, lat 
 Tyler.Map(extent; provider=Tyler.TileProviders.Esri(:WorldImagery), plot_config=config)
 ```
 """
-PlotConfig(; preprocess=identity, postprocess=identity, plot_attributes...) = PlotConfig(Dict{Symbol,Any}(plot_attributes), preprocess, postprocess)
+PlotConfig(; preprocess=identity, postprocess=identity, plot_attributes...) = 
+    PlotConfig(Dict{Symbol,Any}(plot_attributes), preprocess, postprocess)
 
 
 function get_bounds(tile::Tile, data, crs)
@@ -193,7 +194,9 @@ function get_bounds(tile::Tile, data::ElevationData, crs)
     return Rect3d(origin, w)
 end
 
-function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::ElevationData, bounds::Rect, tile_crs)
+function create_tileplot!(
+    config::PlotConfig, axis::AbstractAxis, data::ElevationData, bounds::Rect, tile_crs
+)
     # not so elegant with empty array, we may want to make this a bit nicer going forward
     color = isempty(data.color) ? (;) : (color=data.color,)
     mini, maxi = extrema(bounds)
@@ -211,7 +214,9 @@ function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::Elevatio
     return p
 end
 
-function update_tile_plot!(plot::Surface, ::PlotConfig, ::AbstractAxis, data::ElevationData, bounds::Rect, tile_crs)
+function update_tile_plot!(
+    plot::Surface, ::PlotConfig, ::AbstractAxis, data::ElevationData, bounds::Rect, tile_crs
+)
     mini, maxi = extrema(bounds)
     plot.args[1].val = (mini[1], maxi[1])
     plot.args[2].val = (mini[2], maxi[2])
@@ -228,7 +233,9 @@ end
 
 const ImageData = AbstractMatrix{<:Colorant}
 
-function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs)
+function create_tileplot!(
+    config::PlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs
+)
     mini, maxi = extrema(bounds)
     plot = Makie.image!(
         axis.scene,
@@ -240,7 +247,9 @@ function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::ImageDat
     return plot
 end
 
-function update_tile_plot!(plot::Makie.Image, ::PlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs)
+function update_tile_plot!(
+    plot::Makie.Image, ::PlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs
+)
     mini, maxi = extrema(bounds)
     plot[1] = (mini[1], maxi[1])
     plot[2] = (mini[2], maxi[2])
@@ -270,7 +279,9 @@ function Base.map(f::Function, data::PointCloudData)
     )
 end
 
-function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::PointCloudData, ::Rect, tile_crs)
+function create_tileplot!(
+    config::PlotConfig, axis::AbstractAxis, data::PointCloudData, ::Rect, tile_crs
+)
     p = Makie.scatter!(
         axis.scene, data.points;
         color=data.color,
@@ -284,7 +295,9 @@ function create_tileplot!(config::PlotConfig, axis::AbstractAxis, data::PointClo
     return p
 end
 
-function update_tile_plot!(plot::Makie.Scatter, ::PlotConfig, ::AbstractAxis, data::PointCloudData, bounds::Rect, tile_crs)
+function update_tile_plot!(
+    plot::Makie.Scatter, ::PlotConfig, ::AbstractAxis, data::PointCloudData, bounds::Rect, tile_crs
+)
     plot.color.val = data.color
     plot[1] = data.points
     plot.markersize = data.msize
@@ -298,7 +311,9 @@ MeshScatterPlotconfig(args...; attr...) = MeshScatterPlotconfig(PlotConfig(args.
 get_preprocess(config::AbstractPlotConfig) = get_preprocess(config.plcfg)
 get_postprocess(config::AbstractPlotConfig) = get_postprocess(config.plcfg)
 
-function create_tileplot!(config::MeshScatterPlotconfig, axis::AbstractAxis, data::PointCloudData, ::Rect, tile_crs)
+function create_tileplot!(
+    config::MeshScatterPlotconfig, axis::AbstractAxis, data::PointCloudData, ::Rect, tile_crs
+)
     m = Rect3f(Vec3f(0), Vec3f(1))
     p = Makie.meshscatter!(
         axis.scene, data.points;
@@ -311,7 +326,9 @@ function create_tileplot!(config::MeshScatterPlotconfig, axis::AbstractAxis, dat
     return p
 end
 
-function update_tile_plot!(plot::Makie.MeshScatter, ::MeshScatterPlotconfig, ::AbstractAxis, data::PointCloudData, bounds::Rect, tile_crs)
+function update_tile_plot!(
+    plot::Makie.MeshScatter, ::MeshScatterPlotconfig, ::AbstractAxis, data::PointCloudData, bounds::Rect, tile_crs
+)
     plot.color = data.color
     plot[1] = data.points
     plot.markersize = data.msize
@@ -326,10 +343,12 @@ end
 struct DebugPlotConfig <: AbstractPlotConfig
     attributes::Dict{Symbol,Any}
 end
+DebugPlotConfig(; plot_attributes...) = 
+    DebugPlotConfig(Dict{Symbol,Any}(plot_attributes))
 
-DebugPlotConfig(; plot_attributes...) = DebugPlotConfig(Dict{Symbol,Any}(plot_attributes))
-
-function create_tileplot!(config::DebugPlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs)
+function create_tileplot!(
+    config::DebugPlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs
+)
     plot = Makie.poly!(
         axis.scene,
         bounds;
@@ -343,7 +362,9 @@ function create_tileplot!(config::DebugPlotConfig, axis::AbstractAxis, data::Ima
     return plot
 end
 
-function update_tile_plot!(plot::Makie.Poly, ::DebugPlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs)
+function update_tile_plot!(
+    plot::Makie.Poly, ::DebugPlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs
+)
     plot[1] = bounds
     plot.color = reverse(data; dims=1)
     return

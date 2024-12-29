@@ -23,8 +23,26 @@ Pkg.add(["Tyler.jl"])
 ## Demo: London
 
 ````@example london
-using Tyler, GLMakie
-m = Tyler.Map(Rect2f(-0.0921, 51.5, 0.04, 0.025))
+nothing
+using Tyler, GLMakie, Extents, GeoMakie, GeoFormatTypes
+fig = Figure()
+ax = GeoAxis(fig[1, 1])
+
+# plot
+b = Rect2f(-20.0, -20.0, 40.0, 40.0)
+m = Tyler.Map(b, figure = fig, axis = ax, max_parallel_downloads=100)
+m = Tyler.Map(Extent(X=(40.0, 70.0), Y=(10.0, 20.0));
+    provider=Tyler.TileProviders.Google(),
+    size=(500, 500),
+    max_parallel_downloads=8,
+)
+figure = Figure()
+axis = GeoAxis(figure[1, 1]; dest=EPSG(4326))
+    #provider=Tyler.TileProviders.Google(),
+    #fetching_scheme=Tyler.SimpleTiling(),
+#    figure, axis,
+)
+
 ````
 
 

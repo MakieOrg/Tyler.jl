@@ -8,10 +8,56 @@ struct TileCache{TileFormat,Downloader}
     downloaded_tiles::Channel{Tuple{Tile,Union{Nothing, TileFormat}}}
     downloader::Vector{Downloader}
 end
+function TileCache(provider; cache_size_gb=5, max_parallel_downloads=1)
+    TileFormat = get_tile_format(provider)
+    downloader = [get_downloader(provider) for i in 1:max_parallel_downloads]
+    fetched_tiles = LRU{String,Union{Nothing, TileFormat}}(; maxsize=cache_size_gb * 10^9, by=Base.summarysize)
+    downloaded_tiles = Channel{Tuple{Tile,Union{Nothing, TileFormat}}}(Inf)
+    tile_queue = Channel{Tile}(Inf)
 
-get_tile_format(provider) = Matrix{RGB{N0f8}}
+    async = Threads.nthreads(:default) <= 1
+    if async && max_parallel_downloads > 1
+        @warn "Multiple download threads are not supported with Threads.nthreads()==1, falling back to async. Start Julia with more threads for parallel downloads."
+        async = true
+    end
+    @assert max_parallel_downloads > 0
+    for thread in 1:max_parallel_downloads
+        dl = downloader[thread]
+        if async
+            @async run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
+        else
+            Threads.@spawn run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
+        end
+    end
+    return TileCache{TileFormat,eltype(downloader)}(provider, fetched_tiles, tile_queue, downloaded_tiles, downloader)
+end
 
-get_downloader(provider) = ByteDownloader()
+# Base methods
+
+function Base.close(tiles::TileCache)
+    close(tiles.tile_queue)
+    close(tiles.downloaded_tiles)
+    empty!(tiles.fetched_tiles)
+end
+
+function Base.wait(tiles::TileCache; timeout=50)
+    # wait for all tiles to get downloaded
+    items = lock(tiles.tile_queue) do
+        copy(tiles.tile_queue.data)
+    end
+    tile_keys = filter!(!isnothing, map(t-> tile_key(tiles.provider, t), items))
+    start = time()
+    while true
+        if isempty(tiles.tile_queue) && all(tk -> haskey(tiles.fetched_tiles, tk), tile_keys)
+            break
+        end
+        if time() - start > timeout
+            @warn "Timeout while waiting for tiles to download"
+            break
+        end
+        sleep(0.01)
+    end
+end
 
 function take_last!(c::Channel)
     lock(c)
@@ -29,7 +75,6 @@ function take_last!(c::Channel)
         unlock(c)
     end
 end
-
 
 function run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
     while isopen(tile_queue) || isready(tile_queue)
@@ -63,67 +108,5 @@ function run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
         end
         put!(downloaded_tiles, (tile, result))
         yield()
-    end
-end
-
-function Base.close(tiles::TileCache)
-    close(tiles.tile_queue)
-    close(tiles.downloaded_tiles)
-    empty!(tiles.fetched_tiles)
-end
-
-function TileCache(provider; cache_size_gb=5, max_parallel_downloads=1)
-    TileFormat = get_tile_format(provider)
-    downloader = [get_downloader(provider) for i in 1:max_parallel_downloads]
-    fetched_tiles = LRU{String,Union{Nothing, TileFormat}}(; maxsize=cache_size_gb * 10^9, by=Base.summarysize)
-    downloaded_tiles = Channel{Tuple{Tile,Union{Nothing, TileFormat}}}(Inf)
-    tile_queue = Channel{Tile}(Inf)
-
-    async = Threads.nthreads(:default) <= 1
-    if async && max_parallel_downloads > 1
-        @warn "Multiple download threads are not supported with Threads.nthreads()==1, falling back to async. Start Julia with more threads for parallel downloads."
-        async = true
-    end
-    @assert max_parallel_downloads > 0
-    for thread in 1:max_parallel_downloads
-        dl = downloader[thread]
-        if async
-            @async run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
-        else
-            Threads.@spawn run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
-        end
-    end
-    return TileCache{TileFormat,eltype(downloader)}(provider, fetched_tiles, tile_queue, downloaded_tiles, downloader)
-end
-
-function fetch_tile(provider::AbstractProvider, downloader::AbstractDownloader, tile::Tile)
-    url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
-    isnothing(url) && return nothing
-    data = download_tile_data(downloader, provider, url)
-    return load_tile_data(provider, data)
-end
-
-function load_tile_data(::AbstractProvider, downloaded::AbstractVector{UInt8})
-    io = IOBuffer(downloaded)
-    format = FileIO.query(io)  # this interrogates the magic bits to see what file format it is (JPEG, PNG, etc)
-    return FileIO.load(format) # this works because we have ImageIO loaded
-end
-
-function Base.wait(tiles::TileCache; timeout=50)
-    # wait for all tiles to get downloaded
-    items = lock(tiles.tile_queue) do
-        copy(tiles.tile_queue.data)
-    end
-    tile_keys = filter!(!isnothing, map(t-> tile_key(tiles.provider, t), items))
-    start = time()
-    while true
-        if isempty(tiles.tile_queue) && all(tk -> haskey(tiles.fetched_tiles, tk), tile_keys)
-            break
-        end
-        if time() - start > timeout
-            @warn "Timeout while waiting for tiles to download"
-            break
-        end
-        sleep(0.01)
     end
 end
