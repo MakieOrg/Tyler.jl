@@ -41,11 +41,11 @@ abstract type FetchingScheme end
 abstract type AbstractMap end
 
 include("downloader.jl")
-include("tiles.jl")
+include("tile-cache.jl")
 include("map.jl")
-include("3d-map.jl")
-include("tyler-cam3d.jl")
-include("tile-plottharedl")
+include("map3d.jl")
+include("cam3d.jl")
+include("tile-plotting.jl")
 include("tile-fetching.jl")
 include("provider/shared.jl")
 include("provider/interpolations.jl")
