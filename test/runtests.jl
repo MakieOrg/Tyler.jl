@@ -41,6 +41,7 @@ end
 @testset "NamedTuple axis syntax" begin
     b = Rect2f(-20.0, -20.0, 40.0, 40.0)
     m1 = @test_nowarn Tyler.Map(b, axis = (; type = Axis, aspect = AxisAspect(1)))
+    wait(m1)
     @test only(contents(m1.figure.layout[1, 1])) isa Axis
     @test only(contents(m1.figure.layout[1, 1])).aspect[] == AxisAspect(1)
     # close(m1)
