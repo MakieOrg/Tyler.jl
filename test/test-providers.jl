@@ -110,7 +110,7 @@ begin
     # subset = "AHN4_T" # Takes _really_ long to load, even from disk (~300mb compressed points per tile)
     provider = GeoTilePointCloudProvider(subset=subset)
     m1 = Tyler.Map3D(ext; provider=provider)
-    m2 = Tyler.Map3D(ext; provider=ElevationProvider(), figure=m1.figure, axis=m1.axis)
+    # m2 = Tyler.Map3D(ext; provider=ElevationProvider(), figure=m1.figure, axis=m1.axis)
     m1
 end
 

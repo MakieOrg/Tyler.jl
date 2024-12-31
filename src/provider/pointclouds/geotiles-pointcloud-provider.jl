@@ -1,4 +1,3 @@
-
 """
     GeoTilePointCloudProvider(subset="AHN1_T")
 
@@ -15,11 +14,55 @@ struct GeoTilePointCloudProvider <: TileProviders.AbstractProvider
     lookup
     projs::Vector{Proj.Transformation}
 end
+function GeoTilePointCloudProvider(; baseurl="https://geotiles.citg.tudelft.nl", subset="AHN1_T")
+    projs = [Proj.Transformation(GFT.EPSG(28992), GFT.EPSG(3857)) for i in 1:Threads.maxthreadid()]
+    return GeoTilePointCloudProvider(baseurl, subset, get_ahn_sub_mapping(), projs)
+end
 
-get_tile_format(::GeoTilePointCloudProvider) = PointCloudData
+# TileProviders interface
 TileProviders.options(::GeoTilePointCloudProvider) = nothing
 TileProviders.min_zoom(::GeoTilePointCloudProvider) = 16
 TileProviders.max_zoom(::GeoTilePointCloudProvider) = 16
+function TileProviders.geturl(p::GeoTilePointCloudProvider, x::Integer, y::Integer, z::Integer)
+    if z == TileProviders.min_zoom(p) && haskey(p.lookup, (x, y))
+        return string(p.baseurl, "/", p.subset, "/", p.lookup[(x, y)], ".LAZ")
+    end
+    return nothing
+end
+
+# Tyler interface
+get_tile_format(::GeoTilePointCloudProvider) = PointCloudData
+file_ending(::GeoTilePointCloudProvider) = ".laz"
+function get_downloader(::GeoTilePointCloudProvider)
+    cache_dir = joinpath(CACHE_PATH[], "GeoTilePointCloudProvider")
+    return PathDownloader(cache_dir)
+end
+
+function load_tile_data(provider::GeoTilePointCloudProvider, path::String)
+    pc = LAS(path)
+    isempty(pc.points) && return nothing
+    proj = provider.projs[Threads.threadid()]
+    points = get_points(pc, Point3f(pc.coord_offset), Point3f(pc.coord_scale), proj)
+    extrema = Point3f.(proj.(Point3f[pc.coord_min, pc.coord_max]))
+    if hasproperty(pc.points[1], :color_channels)
+        color = map(pc.points) do p
+            c = map(x -> N0f8(x / 255), p.color_channels)
+            return RGB(c[1], c[2], c[3])
+        end
+    else
+        color = last.(points) # z as fallback
+    end
+    best_markersize = Dict(
+        "AHN1_T" => 9.0,
+        "AHN2_T" => 5.0,
+        "AHN3_T" => 4.0,
+        "AHN4_T" => 2.0
+    )
+    bb = Rect3d(extrema[1], extrema[2] .- extrema[1])
+    return PointCloudData(points, color, bb, best_markersize[provider.subset])
+end
+
+# Geotile utils
 
 const AHN_SUB_MAPPING = Dict{Tuple{Int,Int},String}()
 
@@ -45,52 +88,9 @@ function get_ahn_sub_mapping()
     return AHN_SUB_MAPPING
 end
 
-function GeoTilePointCloudProvider(; baseurl="https://geotiles.citg.tudelft.nl", subset="AHN1_T")
-    projs = [Proj.Transformation(GFT.EPSG(28992), GFT.EPSG(3857)) for i in 1:Threads.maxthreadid()]
-    return GeoTilePointCloudProvider(baseurl, subset, get_ahn_sub_mapping(), projs)
-end
-
-function get_downloader(::GeoTilePointCloudProvider)
-    cache_dir = joinpath(CACHE_PATH[], "GeoTilePointCloudProvider")
-    return PathDownloader(cache_dir)
-end
-
-file_ending(::GeoTilePointCloudProvider) = ".laz"
-
-function TileProviders.geturl(p::GeoTilePointCloudProvider, x::Integer, y::Integer, z::Integer)
-    if z == TileProviders.min_zoom(p) && haskey(p.lookup, (x, y))
-        return string(p.baseurl, "/", p.subset, "/", p.lookup[(x, y)], ".LAZ")
-    end
-    return nothing
-end
-
 function get_points(las, offset, scale, proj)
     return map(las.points) do p
         point = Point3f(offset .+ Point3f(p.coords) .* scale)
         Point3f(proj(point.data))
     end
-end
-
-function load_tile_data(provider::GeoTilePointCloudProvider, path::String)
-    pc = LAS(path)
-    isempty(pc.points) && return nothing
-    proj = provider.projs[Threads.threadid()]
-    points = get_points(pc, Point3f(pc.coord_offset), Point3f(pc.coord_scale), proj)
-    extrema = Point3f.(proj.(Point3f[pc.coord_min, pc.coord_max]))
-    if hasproperty(pc.points[1], :color_channels)
-        color = map(pc.points) do p
-            c = map(x -> N0f8(x / 255), p.color_channels)
-            return RGB(c[1], c[2], c[3])
-        end
-    else
-        color = last.(points) # z as fallback
-    end
-    best_markersize = Dict(
-        "AHN1_T" => 9.0,
-        "AHN2_T" => 5.0,
-        "AHN3_T" => 4.0,
-        "AHN4_T" => 2.0
-    )
-    bb = Rect3d(extrema[1], extrema[2] .- extrema[1])
-    return PointCloudData(points, color, bb, best_markersize[provider.subset])
 end

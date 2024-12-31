@@ -1,3 +1,4 @@
+# Queue management
 
 function queue_plot!(m::Map, tile)
     key = tile_key(m.provider, tile)
@@ -187,10 +188,18 @@ function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camer
     camc.far[] = maxdist
     camc.near[] = eyepos[3] * 0.01
     update_cam!(m.axis.scene)
-    foreground = tiles_from_poly(m, points)
+    foreground = tiles_from_poly(m, points; zshift=0)
     background = OrderedSet{Tile}()
+    # for i in 2:2:6
+    #     tiles = tiles_from_poly(m, points; zshift=-i)
+    #     union!(foreground, tiles)
+    # end
     offscreen = OrderedSet{Tile}()
-    return (; foreground, background, offscreen)
+    tiles = (; foreground, background, offscreen)
+    return tiles
+    # Reverse the order of the groups. Reversing the ranges 
+    # above doesn't have the same effect due to then unions
+    # return map(OrderedSet ∘ reverse ∘ collect, tiles)
 end
 function get_tiles_for_area(m::Map{LScene}, s::SimpleTiling, (cam, camc)::Tuple{Camera,Camera3D})
     area = area_around_lookat(camc)
@@ -206,6 +215,7 @@ function get_resolution(map::Map)
     return isnothing(screen) ? size(map.axis.scene) .* 1.5 : size(screen)
 end
 
+# TODO this will be in Extents.jl soon, so remove
 function grow_extent(area::Union{Rect,Extent}, factor)
     Extent(map(Extents.bounds(area)) do axis_bounds
         span = axis_bounds[2] - axis_bounds[1]
@@ -225,7 +235,6 @@ function optimal_zoom(m::Map, diagonal)
     actual_zoom = clamp(z, min_zoom(m), max_zoom(m))
     return z, actual_zoom, approx_tiles(m, actual_zoom, diagonal)
 end
-
 function optimal_zoom(crs, diagonal, diagonal_resolution, zoom_range, old_zoom)
     # TODO, this should come from provider
     tile_diag_res = norm((255, 255))
