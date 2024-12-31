@@ -50,12 +50,7 @@ function update_tiles!(m::Map, arealike)
 
     # Move all plots to the back, that aren't in the newest tileset anymore
     for (key, (plot, tile, bounds)) in m.plots
-        dist = abs(m.zoom[] - tile.z)
-        if haskey(m.foreground_tiles, tile)
-            move_in_front!(plot, dist, bounds)
-        else
-            move_to_back!(plot, dist, bounds)
-        end
+        move_z(m, plot, tile, bounds)
     end
 
     # Remove any item from queue, that isn't in the new set
@@ -188,7 +183,7 @@ function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camer
     camc.far[] = maxdist
     camc.near[] = eyepos[3] * 0.01
     update_cam!(m.axis.scene)
-    foreground = tiles_from_poly(m, points; zshift=0)
+    foreground = tiles_from_poly(m, points)
     background = OrderedSet{Tile}()
     # for i in 2:2:6
     #     tiles = tiles_from_poly(m, points; zshift=-i)
