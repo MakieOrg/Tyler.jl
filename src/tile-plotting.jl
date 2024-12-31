@@ -211,6 +211,11 @@ function create_tileplot!(
         colorrange=data.elevation_range,
         config.attributes...
     )
+    # so that things get plotted on top of this
+    # note that all translation / scaling is done by the arguments
+    # not by modifying the plot's transformation as was done in previous Tyler v0.1.5 and below
+    # so this should hold indefinitely
+    translate!(p, 0, 0, -10) 
     return p
 end
 
