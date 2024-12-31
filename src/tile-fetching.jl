@@ -50,12 +50,7 @@ function update_tiles!(m::Map, arealike)
 
     # Move all plots to the back, that aren't in the newest tileset anymore
     for (key, (plot, tile, bounds)) in m.plots
-        dist = abs(m.zoom[] - tile.z)
-        if haskey(m.foreground_tiles, tile)
-            move_in_front!(plot, dist, bounds)
-        else
-            move_to_back!(plot, dist, bounds)
-        end
+        move_z(m, plot, tile, bounds)
     end
 
     # Remove any item from queue, that isn't in the new set
