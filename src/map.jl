@@ -134,7 +134,7 @@ function Map(extent, extent_crs=wgs84;
                 # That means we won't plot this tile and it should not be in the queue anymore
                 delete!(map.should_get_plotted, tile_key(map.provider, tile))
             else
-                create_tile_plot!(map, tile, data)
+                create_tyler_plot!(map, tile, data)
             end
         catch e
             @warn "error while creating tile" exception = (e, Base.catch_backtrace())
@@ -205,7 +205,7 @@ function setup_axis!(axis::Axis, ext_target, crs)
     X = ext_target.X
     Y = ext_target.Y
     axis.autolimitaspect = 1
-    Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
+    # Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
     axis.elements[:background].depth_shift[] = 0.1f0
     translate!(axis.elements[:background], 0, 0, -1000)
     axis.elements[:background].color = :transparent
