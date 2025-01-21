@@ -35,7 +35,7 @@ display(m)
     #     Tyler.MapTiles.project(b, from, to)
     # end ≈ Extents.extent(london)
     @test Extents.extent(m) isa Extents.Extent
-    @test GeoInterface.crs(m) == Tyler.MapTiles.WebMercator()
+    @test GeoInterface.crs(m) isa Tyler.MapTiles.WebMercator
 end
 
 @testset "NamedTuple axis syntax" begin
