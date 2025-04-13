@@ -14,6 +14,7 @@ function Tyler.create_tileplot!(config::PlotConfig, axis::GeoAxis, data::ImageDa
         source = tile_crs[2], # tile_crs is a tuple of (tile, crs), we can pass the CRS directly to GeoMakie though
         config.attributes...
     )
+    translate!(plot, 0, 0, -10) # only for GeoAxis (2D) and ImageData...
     return plot
 end
 
@@ -24,6 +25,8 @@ function Tyler.update_tile_plot!(plot::GeoMakie.MeshImage, ::PlotConfig, axis::A
     plot[3] = data
     return
 end
+
+# TODO: plot configs for ElevationData
 
 
 ########################################
