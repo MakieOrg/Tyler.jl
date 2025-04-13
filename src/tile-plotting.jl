@@ -247,6 +247,21 @@ function create_tileplot!(
     return plot
 end
 
+function create_tileplot!(
+    config::PlotConfig, axis::Axis, data::ImageData, bounds::Rect, tile_crs
+)
+    mini, maxi = extrema(bounds)
+    plot = Makie.image!(
+        axis.scene,
+        (mini[1], maxi[1]), (mini[2], maxi[2]), data;
+        uv_transform=Mat{2,3,Float32}(0, 1, 1, 0, 0, 0),
+        inspectable=false,
+        config.attributes...
+    )
+    translate!(plot, 0, 0, -10) # only for Axis (2D) on ImageData
+    return plot
+end
+
 function update_tile_plot!(
     plot::Makie.Image, ::PlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs
 )
