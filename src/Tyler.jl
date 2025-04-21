@@ -23,7 +23,7 @@ using GeometryBasics: decompose, decompose_uv
 using HTTP: HTTP
 using LRUCache: LRUCache, LRU
 using Makie: AbstractAxis, Observable, Figure, Axis, LScene, RGBAf
-using Makie: on, isopen, meta, mesh!, translate!, scale!, Plot
+using Makie: on, isopen, mesh!, translate!, scale!, Plot
 using MapTiles: MapTiles, Tile, TileGrid, web_mercator, wgs84, CoordinateReferenceSystemFormat
 using OrderedCollections: OrderedCollections, OrderedSet
 using ThreadSafeDicts: ThreadSafeDicts, ThreadSafeDict
