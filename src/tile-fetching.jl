@@ -188,7 +188,7 @@ function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camer
     camc.far[] = maxdist
     camc.near[] = eyepos[3] * 0.01
     update_cam!(m.axis.scene)
-    foreground = tiles_from_poly(m, points; zshift=0)
+    foreground = tiles_from_poly(m, points)
     background = OrderedSet{Tile}()
     # for i in 2:2:6
     #     tiles = tiles_from_poly(m, points; zshift=-i)
