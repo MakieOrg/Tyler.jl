@@ -265,8 +265,22 @@ TileProviders.max_zoom(map::Map) = map.max_zoom
 TileProviders.min_zoom(map::Map) = Int(min_zoom(map.provider))
 
 function get_attribution(provider)
-    _attribution = if haskey(provider.options, :attribution)
-        return provider.options[:attribution]
+    _attribution = if hasproperty(provider, :options)
+        if haskey(provider.options, :attribution)
+            return provider.options[:attribution]
+        end
+        return ""
+    elseif hasproperty(provider, :color_provider)
+        if hasproperty(provider.color_provider, :options)
+            if haskey(provider.color_provider.options, :attribution)
+                return provider.color_provider.options[:attribution]
+            end
+            return ""
+        else
+            return ""
+        end
+    elseif hasproperty(provider, :baseurl)
+        return getproperty(provider, :baseurl)
     else
         return ""
     end
