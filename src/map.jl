@@ -134,7 +134,7 @@ function Map(extent, extent_crs=wgs84;
                 # That means we won't plot this tile and it should not be in the queue anymore
                 delete!(map.should_get_plotted, tile_key(map.provider, tile))
             else
-                create_tile_plot!(map, tile, data)
+                create_tyler_plot!(map, tile, data)
             end
         catch e
             @warn "error while creating tile" exception = (e, Base.catch_backtrace())

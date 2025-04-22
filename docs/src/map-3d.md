@@ -54,7 +54,7 @@ delta = 0.008
 ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
 provider = Tyler.GeoTilePointCloudProvider()
 image = ElevationProvider(nothing)
-cfg = Tyler.MeshScatterPlotconfig()
+cfg = Tyler.MeshScatterPlotconfig(; markersize=2)
 m1 = Tyler.Map3D(ext; provider=provider, plot_config=cfg)
 cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=FastShading, colormap=:alpine)
 m2 = Tyler.Map3D(m1; provider=image, plot_config=cfg)

@@ -4,7 +4,7 @@ function move_in_front!(plot, amount, ::Rect2)
     if !hasproperty(plot, :depth_shift)
         translate!(plot, 0, 0, amount)
     else
-        plot.depth_shift = -amount / 100f0
+        plot.depth_shift = -amount / 10000f0
     end
 end
 
@@ -13,8 +13,29 @@ function move_to_back!(plot, amount, ::Rect2)
     if !hasproperty(plot, :depth_shift)
         translate!(plot, 0, 0, -amount)
     else
-        plot.depth_shift = amount / 100f0
+        plot.depth_shift = amount / 10000f0
     end
+end
+
+move_z(m::AbstractMap, plot, tile::Tile, bounds::Rect3) = nothing
+function move_z(m::AbstractMap, plot, tile::Tile, bounds::Rect2)
+    # We want to see everything of the current zoom and more zoomed out, 
+    # to fill gaps until they load
+    if haskey(m.foreground_tiles, tile)
+        plot.visible = true
+        amount = -tile.z
+    elseif m.zoom[] >= tile.z
+        # @show "zoom is more or equal tile"
+        plot.visible = true
+        # move_to_front!(plot, amount, bounds)
+        # If we are zoomed in we want to see everything
+        # of that zoom and more zoomed out, to fill gaps until they load
+        amount = 30 - tile.z # Flip the order for negative shift
+        move_to_back!(plot, amount, bounds)
+    else
+        plot.visible = false
+    end
+    # @show m.zoom[] tile.z amount shift
 end
 
 struct PlotConfig <: AbstractPlotConfig
@@ -126,7 +147,7 @@ function cull_plots!(m::Map)
     end
 end
 
-function create_tile_plot!(m::AbstractMap, tile::Tile, data)
+function create_tyler_plot!(m::AbstractMap, tile::Tile, data)
     # For providers which have to map the same data to different tiles
     # Or providers that have e.g. additional parameters like a date
     # the url is a much better key than the tile itself
@@ -149,16 +170,10 @@ function create_tile_plot!(m::AbstractMap, tile::Tile, data)
     cull_plots!(m)
 
     if isempty(m.unused_plots)
-        mplot = create_tileplot!(cfg, m.axis, data_processed, bounds, (tile, m.crs))
+        mplot = create_tileplot!(cfg, m.axis, m, data_processed, bounds, (tile, m.crs))
     else
         mplot = pop!(m.unused_plots)
-        update_tile_plot!(mplot, cfg, m.axis, data_processed, bounds, (tile, m.crs))
-    end
-
-    if haskey(m.foreground_tiles, tile)
-        move_in_front!(mplot, abs(m.zoom[] - tile.z), bounds)
-    else
-        move_to_back!(mplot, abs(m.zoom[] - tile.z), bounds)
+        update_tile_plot!(mplot, cfg, m.axis, m, data_processed, bounds, (tile, m.crs))
     end
 
     # Always move new plots to the front
@@ -195,7 +210,7 @@ function get_bounds(tile::Tile, data::ElevationData, crs)
 end
 
 function create_tileplot!(
-    config::PlotConfig, axis::AbstractAxis, data::ElevationData, bounds::Rect, tile_crs
+    config::PlotConfig, axis::AbstractAxis, m, data::ElevationData, bounds::Rect, tile_crs
 )
     # not so elegant with empty array, we may want to make this a bit nicer going forward
     color = isempty(data.color) ? (;) : (color=data.color,)
@@ -215,7 +230,7 @@ function create_tileplot!(
 end
 
 function update_tile_plot!(
-    plot::Surface, ::PlotConfig, ::AbstractAxis, data::ElevationData, bounds::Rect, tile_crs
+    plot::Surface, ::PlotConfig, ::AbstractAxis, m, data::ElevationData, bounds::Rect, tile_crs
 )
     mini, maxi = extrema(bounds)
     plot.args[1].val = (mini[1], maxi[1])
@@ -234,7 +249,7 @@ end
 const ImageData = AbstractMatrix{<:Colorant}
 
 function create_tileplot!(
-    config::PlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs
+    config::PlotConfig, axis::AbstractAxis, m, data::ImageData, bounds::Rect, (tile, crs)
 )
     mini, maxi = extrema(bounds)
     plot = Makie.image!(
@@ -244,11 +259,12 @@ function create_tileplot!(
         inspectable=false,
         config.attributes...
     )
+    translate!(plot, 0, 0, -10)
     return plot
 end
 
 function update_tile_plot!(
-    plot::Makie.Image, ::PlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs
+    plot::Makie.Image, ::PlotConfig, axis::AbstractAxis, m, data::ImageData, bounds::Rect, tile_crs
 )
     mini, maxi = extrema(bounds)
     plot[1] = (mini[1], maxi[1])
@@ -280,7 +296,7 @@ function Base.map(f::Function, data::PointCloudData)
 end
 
 function create_tileplot!(
-    config::PlotConfig, axis::AbstractAxis, data::PointCloudData, ::Rect, tile_crs
+    config::PlotConfig, axis::AbstractAxis, m, data::PointCloudData, ::Rect, tile_crs
 )
     p = Makie.scatter!(
         axis.scene, data.points;
@@ -296,7 +312,7 @@ function create_tileplot!(
 end
 
 function update_tile_plot!(
-    plot::Makie.Scatter, ::PlotConfig, ::AbstractAxis, data::PointCloudData, bounds::Rect, tile_crs
+    plot::Makie.Scatter, ::PlotConfig, ::AbstractAxis, m, data::PointCloudData, bounds::Rect, tile_crs
 )
     plot.color.val = data.color
     plot[1] = data.points
@@ -312,7 +328,7 @@ get_preprocess(config::AbstractPlotConfig) = get_preprocess(config.plcfg)
 get_postprocess(config::AbstractPlotConfig) = get_postprocess(config.plcfg)
 
 function create_tileplot!(
-    config::MeshScatterPlotconfig, axis::AbstractAxis, data::PointCloudData, ::Rect, tile_crs
+    config::MeshScatterPlotconfig, axis::AbstractAxis, m, data::PointCloudData, ::Rect, tile_crs
 )
     m = Rect3f(Vec3f(0), Vec3f(1))
     p = Makie.meshscatter!(
@@ -327,7 +343,7 @@ function create_tileplot!(
 end
 
 function update_tile_plot!(
-    plot::Makie.MeshScatter, ::MeshScatterPlotconfig, ::AbstractAxis, data::PointCloudData, bounds::Rect, tile_crs
+    plot::Makie.MeshScatter, ::MeshScatterPlotconfig, ::AbstractAxis, m, data::PointCloudData, bounds::Rect, tile_crs
 )
     plot.color = data.color
     plot[1] = data.points
@@ -347,7 +363,7 @@ DebugPlotConfig(; plot_attributes...) =
     DebugPlotConfig(Dict{Symbol,Any}(plot_attributes))
 
 function create_tileplot!(
-    config::DebugPlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs
+    config::DebugPlotConfig, axis::AbstractAxis, m, data::ImageData, bounds::Rect, tile_crs
 )
     plot = Makie.poly!(
         axis.scene,
@@ -363,7 +379,7 @@ function create_tileplot!(
 end
 
 function update_tile_plot!(
-    plot::Makie.Poly, ::DebugPlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs
+    plot::Makie.Poly, ::DebugPlotConfig, axis::AbstractAxis, m, data::ImageData, bounds::Rect, tile_crs
 )
     plot[1] = bounds
     plot.color = reverse(data; dims=1)
