@@ -35,6 +35,11 @@ end
     # @test map(zip(Extents.extent(m)...)) do b
     #     Tyler.MapTiles.project(b, from, to)
     # end ≈ Extents.extent(london)
+    
+    # test Extent input
+    london = Extents.Extent(X=(-0.0921, -0.0521), Y=(51.5, 51.525))
+    m = Tyler.Map(london; scale=1) # waits until all tiles are displayed
+    display(m)
     @test Extents.extent(m) isa Extents.Extent
     @test GeoInterface.crs(m) isa Tyler.MapTiles.WebMercator
 end
