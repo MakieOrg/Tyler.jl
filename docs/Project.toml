@@ -21,5 +21,4 @@ TileProviders = "263fe934-28e1-4ae9-998a-c2629c5fede6"
 Tyler = "e170d443-b9d6-418a-9ee8-061e966341ef"
 
 [sources]
-OSMMakie = {url = "https://github.com/lazarusA/OSMMakie.jl/"}
 Tyler = {path = ".."}
