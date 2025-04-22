@@ -205,7 +205,7 @@ function setup_axis!(axis::Axis, ext_target, crs)
     X = ext_target.X
     Y = ext_target.Y
     axis.autolimitaspect = 1
-    # Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
+    Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
     axis.elements[:background].depth_shift[] = 0.1f0
     translate!(axis.elements[:background], 0, 0, -1000)
     axis.elements[:background].color = :transparent
