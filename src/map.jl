@@ -98,6 +98,7 @@ function Map(extent, extent_crs=wgs84;
         extent isa Extent || (extent = Extents.extent(extent))
         ext_target = MapTiles.project_extent(extent, extent_crs, crs)
         figure, axis = setup_figure_and_axis!(figure, axis, ext_target, crs)
+        setup_attribution!(figure, get_attribution(provider))
     end
 
     tiles = TileCache(provider; cache_size_gb=cache_size_gb, max_parallel_downloads=max_parallel_downloads)
@@ -214,6 +215,19 @@ function setup_axis!(axis::Axis, ext_target, crs)
     return
 end
 
+function setup_attribution!(figure, attribution)
+    Box(figure[1,1], color=(:white, 0.85),
+        tellheight=false, tellwidth=false,
+        valign=0, halign=0.5,
+        height=15, cornerradius=2,
+        strokewidth=0, strokecolor=:transparent
+        )
+    Label(figure[1,1], rich("Powered by ", color=:grey15,
+        rich("Tyler.jl ", color="deepskyblue3", font=:bold),
+            rich("| Map data - "*attribution, color=:grey8, font=:regular), fontsize=12);
+        tellheight=false, tellwidth=false, valign=0, halign=0.5)
+end
+
 toggle_visibility!(m::Map) = m.axis.scene.visible[] = !m.axis.scene.visible[]
 
 function tile_reloader(map::Map{Axis})
@@ -249,6 +263,15 @@ Extents.extent(map::Map) = Extents.extent(map.axis.finallimits[])
 
 TileProviders.max_zoom(map::Map) = map.max_zoom
 TileProviders.min_zoom(map::Map) = Int(min_zoom(map.provider))
+
+function get_attribution(provider)
+    _attribution = if haskey(provider.options, :attribution)
+        return provider.options[:attribution]
+    else
+        return ""
+    end
+    return _attribution
+end
 
 # Base methods
 
