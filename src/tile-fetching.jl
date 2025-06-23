@@ -122,7 +122,7 @@ function get_tiles_for_area(m::Map{Axis}, scheme::Halo2DTiling, area::Union{Rect
     offscreen = OrderedSet{Tile}()
     # Fill tiles for each z layer
     for z in layer_range
-        # Get rings of tiles around the mouse, intersecting 
+        # Get rings of tiles around the mouse, intersecting
         # area so we don't get tiles outside the plot
         for ext_scale in 1:4:100
             # Get an extent
@@ -147,7 +147,7 @@ function get_tiles_for_area(m::Map{Axis}, scheme::Halo2DTiling, area::Union{Rect
         union!(offscreen, halo_tiles)
     end
     tiles = (; foreground, background, offscreen)
-    # Reverse the order of the groups. Reversing the ranges 
+    # Reverse the order of the groups. Reversing the ranges
     # above doesn't have the same effect due to then unions
     return map(OrderedSet ∘ reverse ∘ collect, tiles)
 end
@@ -192,7 +192,7 @@ function get_tiles_for_area(m::Map{LScene}, ::Tiling3D, (cam, camc)::Tuple{Camer
     offscreen = OrderedSet{Tile}()
     tiles = (; foreground, background, offscreen)
     return tiles
-    # Reverse the order of the groups. Reversing the ranges 
+    # Reverse the order of the groups. Reversing the ranges
     # above doesn't have the same effect due to then unions
     # return map(OrderedSet ∘ reverse ∘ collect, tiles)
 end
