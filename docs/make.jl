@@ -25,7 +25,7 @@ makedocs(;
             "Interpolation on the fly" => "examples/interpolation.md",
             "Map3D" => "examples/map-3d.md",
         ],
-        "API" => "API.md",
+        "API" => "api.md",
     ],
     draft=false,
     source="src",
