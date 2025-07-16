@@ -20,7 +20,7 @@ makedocs(;
     warnonly=true,
 )
 
-deploydocs(;
+DocumenterVitepress.deploydocs(;
     repo="github.com/MakieOrg/Tyler.jl.git",
     target="build", # this is where Vitepress stores its output
     branch = "gh-pages",
