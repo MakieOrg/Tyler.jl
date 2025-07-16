@@ -14,6 +14,19 @@ makedocs(;
         devbranch="master",
         devurl="dev";
     ),
+    pages = [
+        "Home" => "index.md",
+        "Getting Started" => "getting_started.md",
+        "Examples" => [
+            "Points, Poly & Text" => "points_poly_text.md",
+            "OpenStreetMap data" => "osmmakie.md",
+            "Whale shark trajectory" => "whale_shark.md",
+            "Ice loss animation" => "iceloss_ex.md",
+            "Interpolation on the fly" => "interpolation.md",
+            "Map3D" => "map-3d.md",
+        ],
+        "API" => "API.md",
+    ]
     draft=false,
     source="src",
     build="build",
