@@ -1,6 +1,6 @@
 # Whale shark's trajectory
 
-The full stack of Makie's ecosystem works.
+In this example, we'll use the full Makie ecosystem to plot the trajectory of a whale shark across time.
 
 Load packages
 

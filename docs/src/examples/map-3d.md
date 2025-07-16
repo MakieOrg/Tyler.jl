@@ -112,7 +112,7 @@ m = Tyler.Map3D(ext;
 render_rpr(m, "alpine", 10000000)
 ```
 
-![](./assets/alpine.png)
+![](../assets/alpine.png)
 
 ### PointClouds with RPRMakie
 
@@ -130,4 +130,4 @@ render_rpr(m, "pointclouds")
 cp(Tyler)
 ```
 
-![](./assets/pointclouds.png)
+![](../assets/pointclouds.png)
