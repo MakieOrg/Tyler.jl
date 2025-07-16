@@ -26,7 +26,7 @@ makedocs(;
             "Map3D" => "examples/map-3d.md",
         ],
         "API" => "API.md",
-    ]
+    ],
     draft=false,
     source="src",
     build="build",
