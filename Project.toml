@@ -1,7 +1,7 @@
 name = "Tyler"
 uuid = "e170d443-b9d6-418a-9ee8-061e966341ef"
 authors = ["SimonDanisch <sdanisch@gmail.com>", "Lazaro Alonso <lazarus.alon@gmail.com>", "Martijn Visser <mgvisser@gmail.com>", "Rafael Schouten <rafaelschouten@gmail.com>"]
-version = "0.2.3"
+version = "0.2.4"
 
 [deps]
 ArchGDAL = "c9ce4bd3-c3d5-55b8-8973-c0e20141b8c3"
