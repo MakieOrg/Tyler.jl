@@ -263,7 +263,7 @@ function update_tile_plot!(
     plot::Makie.Image, ::PlotConfig, axis::AbstractAxis, m, data::ImageData, bounds::Rect, tile_crs
 )
     mini, maxi = extrema(bounds)
-    Makie.update!(plot, mini, maxi, data)
+    Makie.update!(plot, (mini[1], maxi[1]), (mini[2], maxi[2]), data)
     return
 end
 
