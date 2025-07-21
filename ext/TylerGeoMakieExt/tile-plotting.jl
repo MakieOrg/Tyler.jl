@@ -19,9 +19,7 @@ end
 
 function Tyler.update_tile_plot!(plot::GeoMakie.MeshImage, ::PlotConfig, axis::AbstractAxis, data::ImageData, bounds::Rect, tile_crs)
     mini, maxi = extrema(bounds)
-    plot[1] = (mini[1], maxi[1])
-    plot[2] = (mini[2], maxi[2])
-    plot[3] = data
+    update!(plot, (mini[1], maxi[1]), (mini[2], maxi[2]), data)
     return
 end
 
@@ -47,7 +45,6 @@ function create_tileplot!(config::DebugPlotConfig, axis::GeoAxis, data::ImageDat
 end
 
 function update_tile_plot!(plot::Makie.Poly, ::DebugPlotConfig, axis::GeoAxis, data::ImageData, bounds::Rect, tile_crs)
-    plot[1] = bounds
-    plot.color = reverse(data; dims=1)
+    update!(plot, bounds; color = reverse(data; dims = 1))
     return
 end

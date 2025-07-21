@@ -10,10 +10,9 @@ import Tyler: tile_reloader, create_tileplot!, update_tile_plot!,
 
 using Tyler: to_rect, grow_extent, OrderedSet, optimal_zoom, min_zoom, max_zoom
 
-
 using Makie, Makie.GeometryBasics
 
-using Makie: AbstractAxis, Mat
+using Makie: AbstractAxis, Mat, update!
 
 using Extents
 using TileProviders, MapTiles
