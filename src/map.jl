@@ -124,33 +124,31 @@ function Map(extent, extent_crs=wgs84;
     )
 
     map.zoom[] = 0
-    closed = Threads.Atomic{Bool}(false)
+    scene = axis.scene
 
-    display_task[] = @async for (tile, data) in downloaded_tiles
-        closed[] && break
-        try
-            if isnothing(data)
-                # download went wrong or provider doesn't have tile.
-                # That means we won't plot this tile and it should not be in the queue anymore
-                delete!(map.should_get_plotted, tile_key(map.provider, tile))
-            else
-                create_tyler_plot!(map, tile, data)
+    display_task[] = @async begin
+        for (tile, data) in downloaded_tiles
+            if Makie.isclosed(scene)
+                cleanup_queue!(map, OrderedSet{Tile}())
+                close(map)
+                break
             end
-        catch e
-            @warn "error while creating tile" exception = (e, Base.catch_backtrace())
+            try
+                if isnothing(data)
+                    # download went wrong or provider doesn't have tile.
+                    # That means we won't plot this tile and it should not be in the queue anymore
+                    delete!(map.should_get_plotted, tile_key(map.provider, tile))
+                else
+                    create_tyler_plot!(map, tile, data)
+                end
+            catch e
+                @warn "error while creating tile" exception = (e, Base.catch_backtrace())
+            end
         end
     end
 
     tile_reloader(map)
 
-    on(axis.scene.events.window_open) do open
-        if !open && !closed[]
-            closed[] = true
-            # remove all queued tiles!
-            cleanup_queue!(map, OrderedSet{Tile}())
-            close(map)
-        end
-    end
     return map
 end
 
@@ -170,11 +168,11 @@ function setup_figure_and_axis!(figure::Makie.Figure, axis_kws_nt::NamedTuple, e
 end
 function setup_figure_and_axis!(figure::GridPosition, axis, ext_target, crs)
     error("""
-    You have tried to construct a `Map` at a given grid position, 
-    but with a materialized axis of type $(typeof(axis)).  
-    
-    You can only do this if you let Tyler construct the axis, 
-    by passing its parameters as a NamedTuple 
+    You have tried to construct a `Map` at a given grid position,
+    but with a materialized axis of type $(typeof(axis)).
+
+    You can only do this if you let Tyler construct the axis,
+    by passing its parameters as a NamedTuple
     (like `axis = (; type = Axis, ...)`).
     """)
 end
@@ -261,7 +259,6 @@ end
 
 function Base.display(map::AbstractMap)
     wait(map)
-    Base.display(map.figure.scene)
 end
 
 function Base.close(m::Map)

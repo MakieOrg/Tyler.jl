@@ -19,7 +19,7 @@ end
 
 move_z(m::AbstractMap, plot, tile::Tile, bounds::Rect3) = nothing
 function move_z(m::AbstractMap, plot, tile::Tile, bounds::Rect2)
-    # We want to see everything of the current zoom and more zoomed out, 
+    # We want to see everything of the current zoom and more zoomed out,
     # to fill gaps until they load
     if haskey(m.foreground_tiles, tile)
         plot.visible = true
@@ -68,7 +68,7 @@ extent = Extent(; X=(lon - delta / 2, lon + delta / 2), Y=(lat - delta / 2, lat 
 Tyler.Map(extent; provider=Tyler.TileProviders.Esri(:WorldImagery), plot_config=config)
 ```
 """
-PlotConfig(; preprocess=identity, postprocess=identity, plot_attributes...) = 
+PlotConfig(; preprocess=identity, postprocess=identity, plot_attributes...) =
     PlotConfig(Dict{Symbol,Any}(plot_attributes), preprocess, postprocess)
 
 
@@ -233,12 +233,8 @@ function update_tile_plot!(
     plot::Surface, ::PlotConfig, ::AbstractAxis, m, data::ElevationData, bounds::Rect, tile_crs
 )
     mini, maxi = extrema(bounds)
-    plot.args[1].val = (mini[1], maxi[1])
-    plot.args[2].val = (mini[2], maxi[2])
-    plot[3] = data.elevation
-    if !isempty(data.color)
-        plot.color = data.color
-    end
+    cd = !isempty(data.color) ? (color=data.color,) : (;)
+    Makie.update!(plot, (mini[1], maxi[1]), (mini[2], maxi[2]), data.elevation; cd...)
     return
 end
 
@@ -267,9 +263,7 @@ function update_tile_plot!(
     plot::Makie.Image, ::PlotConfig, axis::AbstractAxis, m, data::ImageData, bounds::Rect, tile_crs
 )
     mini, maxi = extrema(bounds)
-    plot[1] = (mini[1], maxi[1])
-    plot[2] = (mini[2], maxi[2])
-    plot[3] = data
+    Makie.update!(plot, (mini[1], maxi[1]), (mini[2], maxi[2]), data)
     return
 end
 
@@ -314,9 +308,7 @@ end
 function update_tile_plot!(
     plot::Makie.Scatter, ::PlotConfig, ::AbstractAxis, m, data::PointCloudData, bounds::Rect, tile_crs
 )
-    plot.color.val = data.color
-    plot[1] = data.points
-    plot.markersize = data.msize
+    Makie.update!(plot, data.points; color=data.color, markersize=data.msize)
     return
 end
 
@@ -345,9 +337,7 @@ end
 function update_tile_plot!(
     plot::Makie.MeshScatter, ::MeshScatterPlotconfig, ::AbstractAxis, m, data::PointCloudData, bounds::Rect, tile_crs
 )
-    plot.color = data.color
-    plot[1] = data.points
-    plot.markersize = data.msize
+    Makie.update!(plot, data.points; color=data.color, markersize=data.msize)
     return
 end
 
@@ -359,7 +349,7 @@ end
 struct DebugPlotConfig <: AbstractPlotConfig
     attributes::Dict{Symbol,Any}
 end
-DebugPlotConfig(; plot_attributes...) = 
+DebugPlotConfig(; plot_attributes...) =
     DebugPlotConfig(Dict{Symbol,Any}(plot_attributes))
 
 function create_tileplot!(
@@ -381,7 +371,6 @@ end
 function update_tile_plot!(
     plot::Makie.Poly, ::DebugPlotConfig, axis::AbstractAxis, m, data::ImageData, bounds::Rect, tile_crs
 )
-    plot[1] = bounds
-    plot.color = reverse(data; dims=1)
+    update!(plot, bounds; color=reverse(data; dims=1))
     return
 end

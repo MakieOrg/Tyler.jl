@@ -77,7 +77,7 @@ function take_last!(c::Channel)
 end
 
 function run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
-    while isopen(tile_queue) || isready(tile_queue)
+    while isopen(tile_queue)
         tile = take_last!(tile_queue) # priorize newly arrived tiles
         result = nothing
         try
@@ -109,4 +109,5 @@ function run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
         put!(downloaded_tiles, (tile, result))
         yield()
     end
+    close(downloaded_tiles)
 end
