@@ -19,7 +19,7 @@ makedocs(;
         "Getting Started" => "getting_started.md",
         "Examples" => [
             "Points, Poly & Text" => "examples/points_poly_text.md",
-            "OpenStreetMap data" => "examples/osmmakie.md",
+            # "OpenStreetMap data" => "examples/osmmakie.md", # TODO: add this back when OSMMakie has Makie 0.24 compat
             "Whale shark trajectory" => "examples/whale_shark.md",
             "Ice loss animation" => "examples/iceloss_ex.md",
             "Interpolation on the fly" => "examples/interpolation.md",
@@ -27,6 +27,7 @@ makedocs(;
         ],
         "API" => "api.md",
     ],
+    pagesonly = true, # do not run things that are not in the `pages` array
     draft=false,
     source="src",
     build="build",
