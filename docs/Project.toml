@@ -25,3 +25,4 @@ DocumenterVitepress = ">=0.2"
 
 [sources]
 Tyler = {path = ".."}
+OSMMakie = {url = "https://github.com/MakieOrg/OSMMakie.jl", rev = "sd/makie-v0.24"}
