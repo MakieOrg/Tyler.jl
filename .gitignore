@@ -16,4 +16,3 @@ docs/package-lock.json
 *.osm
 london_drive.json
 .qodo
-!docs/Manifest.toml
