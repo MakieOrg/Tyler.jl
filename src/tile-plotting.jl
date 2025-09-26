@@ -300,6 +300,7 @@ function create_tileplot!(
         markerspace=:data,
         fxaa=false,
         inspectable=false,
+        transparency=true,
         config.attributes...
     )
     return p
