@@ -47,7 +47,8 @@ function load_tile_data(provider::GeoTilePointCloudProvider, path::String)
     if !ismissing(PointClouds.IO.color_channels(pc.points[1]))
         color = map(pc.points) do p
             c = PointClouds.IO.color_channels(p)
-            return RGB(N0f8(c[1]), N0f8(c[2]), N0f8(c[3]))
+            # TODO, PointClouds says values should be in 0-1 range, but they seem to require *255 to be in 0-1 range.
+            return RGB(c[1] * 255, c[2] * 255, c[3] * 255)
         end
     else
         color = last.(points) # z as fallback
