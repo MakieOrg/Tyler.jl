@@ -22,7 +22,3 @@ Tyler = "e170d443-b9d6-418a-9ee8-061e966341ef"
 
 [compat]
 DocumenterVitepress = ">=0.2"
-
-[sources]
-Tyler = {path = ".."}
-OSMMakie = {url = "https://github.com/MakieOrg/OSMMakie.jl", rev = "sd/makie-v0.24"}
