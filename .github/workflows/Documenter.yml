@@ -48,7 +48,7 @@ jobs:
       - name: Pull Julia cache
         uses: julia-actions/cache@v2
       - name: Install custom documentation dependencies
-        run: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs -e 'using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.precompile()'
+        run: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
       - name: Build and deploy
         uses: julia-actions/julia-docdeploy@v1
         with:
