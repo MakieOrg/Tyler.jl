@@ -37,7 +37,7 @@ jobs:
       JULIA_DEBUG: "Documenter"
       DATADEPS_ALWAYS_ACCEPT: true
       RASTERDATASOURCES_PATH: "~/.julia/artifacts/RasterDataSources"
-      JULIA_PKG_SERVER=""
+      JULIA_PKG_SERVER: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v5
