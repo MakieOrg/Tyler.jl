@@ -38,7 +38,7 @@ jobs:
         uses: actions/checkout@v5
       - name: Setup Julia
         uses: julia-actions/setup-julia@v2
-        uses: julia-actions/cache@v2
+      # - uses: julia-actions/cache@v2
       - name: Install documentation dependencies
         run: sudo apt-get update && sudo apt-get install -y xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev xsettingsd x11-xserver-utils
       - name: Install custom documentation dependencies
