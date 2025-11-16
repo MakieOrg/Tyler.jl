@@ -10,6 +10,7 @@ Here's a simple example of plotting only the red channel of image data.
 
 ```@example plotconfig
 using Tyler, GLMakie
+using Extents
 using Colors
 
 config = Tyler.PlotConfig(;
