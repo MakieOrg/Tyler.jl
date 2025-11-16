@@ -24,7 +24,7 @@ delta = 0.3
 ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
 cfg = Tyler.PlotConfig(
     preprocess=pc -> map(p -> p .* 2, pc),
-    shading=FastShading, colorrange=(2000, 5000),
+    shading=true, colorrange=(2000, 5000),
     colormap=:alpine
 )
 m = Tyler.Map3D(ext; provider=ElevationProvider(nothing), plot_config=cfg)
@@ -56,7 +56,7 @@ provider = Tyler.GeoTilePointCloudProvider()
 image = ElevationProvider(nothing)
 cfg = Tyler.MeshScatterPlotconfig(; markersize=2)
 m1 = Tyler.Map3D(ext; provider=provider, plot_config=cfg)
-cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=FastShading, colormap=:alpine)
+cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=true, colormap=:alpine)
 m2 = Tyler.Map3D(m1; provider=image, plot_config=cfg)
 m1
 ````
@@ -100,7 +100,7 @@ delta = 0.5
 ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
 cfg = Tyler.PlotConfig(
     preprocess=pc -> map(p -> p .* 2, pc),
-    shading=FastShading,
+    shading=true,
     material=plastic_material(),
     colormap=:alpine
 )
