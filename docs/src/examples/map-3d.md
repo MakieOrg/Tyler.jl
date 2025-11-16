@@ -132,9 +132,9 @@ cp(Tyler)
 
 ![](../assets/pointclouds.png)
 
-## Docs
+## Data source types
 
 ```@docs
-ElevationData
-PointCloudData
+Tyler.ElevationData
+Tyler.PointCloudData
 ```

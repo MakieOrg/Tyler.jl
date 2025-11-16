@@ -61,8 +61,8 @@ The usual plot config is [`PlotConfig`](@ref), but there is also [`DebugPlotConf
 You can also create your own plot configs by inheriting from [`AbstractPlotConfig`](@ref) and following the implementation of e.g. [`DebugPlotConfig`](@ref)!
 
 ```@docs
-PlotConfig
-DebugPlotConfig
-MeshScatterPlotConfig
-AbstractPlotConfig
+Tyler.PlotConfig
+Tyler.DebugPlotConfig
+Tyler.MeshScatterPlotConfig
+Tyler.AbstractPlotConfig
 ```
