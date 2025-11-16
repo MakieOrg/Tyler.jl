@@ -134,7 +134,7 @@ cp(Tyler)
 
 ## Data source types
 
-```@docs
+```
 Tyler.ElevationData
 Tyler.PointCloudData
 ```

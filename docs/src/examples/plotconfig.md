@@ -24,7 +24,7 @@ Tyler.Map(extent; provider=Tyler.TileProviders.Esri(:WorldImagery), plot_config=
 ```
 
 The data you get in the `preprocess` function is whatever the tile provider returns.
-So it can be a matrix of RGBs (`Colors.AbstractColorant`s), or [`ElevationData`](@ref) or [`PointCloudData`](@ref).
+So it can be a matrix of RGBs (`Colors.AbstractColorant`s), or `ElevationData` or `PointCloudData`.
 
 You need to write your plot config according to the provider you intend to use, and the type of axis you are plotting into.
 For example, a `Map` in a GeoAxis will use `GeoMakie.meshimage` plots instead of `Makie.image` plots, and so on.
@@ -55,14 +55,13 @@ m = Tyler.Map3D(ext; provider=ElevationProvider())
 
 ## Types of plot config
 
-All plot configs inherit from [`AbstractPlotConfig`](@ref).  But there are some specialized plot configs for specific use cases.
+All plot configs inherit from `AbstractPlotConfig`.  But there are some specialized plot configs for specific use cases.
 
-The usual plot config is [`PlotConfig`](@ref), but there is also [`DebugPlotConfig`](@ref) for debugging purposes, and [`MeshScatterPlotconfig`](@ref) for point clouds.
-You can also create your own plot configs by inheriting from [`AbstractPlotConfig`](@ref) and following the implementation of e.g. [`DebugPlotConfig`](@ref)!
+The usual plot config is `PlotConfig`, but there is also `DebugPlotConfig` for debugging purposes, and `MeshScatterPlotconfig` for point clouds.
+You can also create your own plot configs by inheriting from `AbstractPlotConfig` and following the implementation of e.g. `DebugPlotConfig`!
 
-```@docs
+```
 Tyler.PlotConfig
 Tyler.DebugPlotConfig
 Tyler.MeshScatterPlotConfig
-Tyler.AbstractPlotConfig
 ```
