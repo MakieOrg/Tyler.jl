@@ -32,22 +32,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
+      DISPLAY: ':0'
+      GKSwstype: "100"
+      JULIA_DEBUG: "Documenter"
+      DATADEPS_ALWAYS_ACCEPT: true
+      RASTERDATASOURCES_PATH: "~/.julia/artifacts/RasterDataSources"
       JULIA_PKG_SERVER: ""
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-      - name: Setup Julia
-        uses: julia-actions/setup-julia@v2
-      # - uses: julia-actions/cache@v2
       - name: Install documentation dependencies
         run: sudo apt-get update && sudo apt-get install -y xorg-dev mesa-utils xvfb libgl1 freeglut3-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev xsettingsd x11-xserver-utils
+      - name: Setup Julia
+        uses: julia-actions/setup-julia@v2
+      - name: Pull Julia cache
+        uses: julia-actions/cache@v2
       - name: Install custom documentation dependencies
-        run: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs -e 'using Pkg; Pkg.resolve(); Pkg.instantiate(); Pkg.precompile()'
+        run: DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs -e 'using Pkg; Pkg.instantiate(); Pkg.precompile()'
       - name: Build and deploy
+        uses: julia-actions/julia-docdeploy@v1
+        with:
+          prefix: xvfb-run
+          install-package: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # For authentication with GitHub Actions token
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }} # For authentication with SSH deploy key
-          JULIA_DEBUG: "Documenter"
-          DATADEPS_ALWAYS_ACCEPT: true
-        run: |
-          DISPLAY=:0 xvfb-run -s '-screen 0 1024x768x24' julia --project=docs/ --color=yes docs/make.jl
