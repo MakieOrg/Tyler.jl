@@ -24,6 +24,7 @@ makedocs(;
             "Ice loss animation" => "examples/iceloss_ex.md",
             "Interpolation on the fly" => "examples/interpolation.md",
             "Map3D" => "examples/map-3d.md",
+            "PlotConfig" => "examples/plotconfig.md",
         ],
         "API" => "api.md",
     ],
