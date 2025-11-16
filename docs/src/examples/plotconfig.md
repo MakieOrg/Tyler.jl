@@ -59,3 +59,10 @@ All plot configs inherit from [`AbstractPlotConfig`](@ref).  But there are some 
 
 The usual plot config is [`PlotConfig`](@ref), but there is also [`DebugPlotConfig`](@ref) for debugging purposes, and [`MeshScatterPlotconfig`](@ref) for point clouds.
 You can also create your own plot configs by inheriting from [`AbstractPlotConfig`](@ref) and following the implementation of e.g. [`DebugPlotConfig`](@ref)!
+
+```@docs
+PlotConfig
+DebugPlotConfig
+MeshScatterPlotConfig
+AbstractPlotConfig
+```
