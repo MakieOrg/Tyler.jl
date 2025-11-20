@@ -214,10 +214,31 @@ end
 
 toggle_visibility!(m::Map) = m.axis.scene.visible[] = !m.axis.scene.visible[]
 
+function throttle_by_tick(scene, observable_to_throttle, time = 2)
+    # Construct a new observable that is throttled by the tick event.
+    throttled = Observable{eltype(observable_to_throttle)}(observable_to_throttle[])
+    time_since_update = Ref{Float64}(0.0)
+    # Listen to the tick event and update the throttled observable.
+    on(scene, events(scene).tick) do tick
+        if tick.state == Makie.RegularRenderTick
+            time_since_update[] += tick.delta_time
+            if time_since_update[] > 0.2
+                time_since_update[] = 0.0
+                if observable_to_throttle[] != throttled[]
+                    throttled[] = observable_to_throttle[]
+                end
+            end
+        else # any other tick state, run the update immediately.  this allows for smoothness in record etc.
+            throttled[] = observable_to_throttle[]
+        end
+    end
+    return throttled
+end
+
 function tile_reloader(map::Map{Axis})
     axis = map.axis
-    throttled = Makie.Observables.throttle(0.2, axis.finallimits)
-    on(axis.scene, throttled; update=true) do extent
+    throttled_bbox = throttle_by_tick(axis.scene, axis.finallimits)
+    on(axis.scene, throttled_bbox; update=true) do extent
         update_tiles!(map, extent)
         return
     end
