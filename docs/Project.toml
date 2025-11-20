@@ -20,9 +20,8 @@ OSMMakie = "76b6901f-8821-46bb-9129-841bc9cfe677"
 TileProviders = "263fe934-28e1-4ae9-998a-c2629c5fede6"
 Tyler = "e170d443-b9d6-418a-9ee8-061e966341ef"
 
-[compat]
-DocumenterVitepress = ">=0.2"
-
 [sources]
 Tyler = {path = ".."}
-OSMMakie = {url = "https://github.com/MakieOrg/OSMMakie.jl", rev = "sd/makie-v0.24"}
+
+[compat]
+DocumenterVitepress = ">=0.2"
