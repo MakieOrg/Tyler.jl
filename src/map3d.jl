@@ -3,6 +3,8 @@ function Map3D(m::Map; kw...)
     # Make a copy of the lscene, so we can easier separate the plots.
     ax2 = LScene(ax.parent, ax.layoutobservables, ax.blockscene)
     ax2.scene = Scene(ax.scene; camera=ax.scene.camera, camera_controls=ax.scene.camera_controls)
+    provider = get(kw, :provider, m.provider)
+    setup_attribution!(ax.parent, get_attribution(provider))
     return Map3D(nothing, nothing; figure=m.figure, axis=ax2, kw...)
 end
 function Map3D(extent, extent_crs=wgs84;
