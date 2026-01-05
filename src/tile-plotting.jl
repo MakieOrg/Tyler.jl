@@ -292,9 +292,12 @@ end
 function create_tileplot!(
     config::PlotConfig, axis::AbstractAxis, m, data::PointCloudData, ::Rect, tile_crs
 )
+    mini, maxi = extrema(data.bounds)
+    dat = data.points
+    col = data.color
     p = Makie.scatter!(
-        axis.scene, data.points;
-        color=data.color,
+        axis.scene, dat;
+        color=col,
         marker=Makie.FastPixel(),
         markersize=data.msize,
         markerspace=:data,
