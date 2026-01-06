@@ -23,17 +23,29 @@ function move_z(m::AbstractMap, plot, tile::Tile, bounds::Rect2)
     # to fill gaps until they load
     if haskey(m.foreground_tiles, tile)
         plot.visible = true
-        amount = -tile.z
+        # Foreground tiles should be in front (negative depth_shift)
+        # Higher zoom = more detail = should be even more in front
+        amount = tile.z
+        move_in_front!(plot, amount, bounds)
     elseif m.zoom[] >= tile.z
-        # @show "zoom is more or equal tile"
+        # Keep tiles visible if we're zoomed in more than the tile zoom
+        # This fills gaps while higher resolution tiles load
         plot.visible = true
-        # move_to_front!(plot, amount, bounds)
-        # If we are zoomed in we want to see everything
-        # of that zoom and more zoomed out, to fill gaps until they load
-        amount = 30 - tile.z # Flip the order for negative shift
+        # Scale depth more gradually to avoid visual jumps
+        amount = 30 - tile.z
         move_to_back!(plot, amount, bounds)
     else
-        plot.visible = false
+        # Don't immediately hide - tiles that are too zoomed in stay visible briefly
+        # This prevents flickering during zoom transitions
+        # Only hide if we're zoomed out more than 2 levels from the tile
+        if m.zoom[] < (tile.z - 2)
+            plot.visible = false
+        else
+            plot.visible = true
+            # Push far back but keep visible during transition
+            amount = 30 - tile.z + 10
+            move_to_back!(plot, amount, bounds)
+        end
     end
     # @show m.zoom[] tile.z amount shift
 end
@@ -164,7 +176,11 @@ function create_tyler_plot!(m::AbstractMap, tile::Tile, data)
     bounds = get_bounds(tile, data_processed, m.crs)
 
     this_got_filtered = filter_overlapping!(m, bounds, tile, key)
-    this_got_filtered && return # skip plotting if it overlaps with a more important plot
+    if this_got_filtered
+        # Tile was filtered out - clean up and skip plotting
+        delete!(m.should_get_plotted, key)
+        return
+    end
 
     # Cull plots over plot limit
     cull_plots!(m)
@@ -176,8 +192,9 @@ function create_tyler_plot!(m::AbstractMap, tile::Tile, data)
         update_tile_plot!(mplot, cfg, m.axis, m, data_processed, bounds, (tile, m.crs))
     end
 
-    # Always move new plots to the front
+    # Set proper z-ordering for the new plot
     mplot.visible = true
+    move_z(m, mplot, tile, bounds)
     get_postprocess(cfg)(mplot)
     m.plots[key] = (mplot, tile, bounds)
     return

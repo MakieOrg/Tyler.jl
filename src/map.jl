@@ -77,6 +77,7 @@ function Map(m::Map; kw...)
     setfield!(ax2.scene, :float32convert, ax.scene.float32convert)
     return Map(nothing, nothing; figure=m.figure, axis=ax2, kw...)
 end
+
 function Map(extent, extent_crs=wgs84;
     size=(1000, 1000),
     figure=Makie.Figure(; size=size),
@@ -127,36 +128,12 @@ function Map(extent, extent_crs=wgs84;
     scene = axis.scene
 
     display_task[] = @async begin
-        # Wait for screen to be available before starting to insert plots
-        # This prevents race condition where plots are inserted during display initialization
-        # which can crash some graphics drivers (especially AMD)
-        screen_ready = false
         for (tile, data) in downloaded_tiles
             if Makie.isclosed(scene)
                 cleanup_queue!(map, OrderedSet{Tile}())
                 close(map)
                 break
             end
-
-            # Wait for screen to be ready before inserting plots
-            if !screen_ready
-                # Check if screen exists
-                screen = Makie.getscreen(scene)
-                if isnothing(screen)
-                    # No screen yet, wait a bit and continue collecting tiles
-                    # This allows tiles to download while waiting for display
-                    sleep(0.01)
-                    # Put the tile back for processing later
-                    put!(downloaded_tiles, (tile, data))
-                    continue
-                else
-                    # Screen is ready, proceed with plotting
-                    screen_ready = true
-                    # Small delay to ensure screen is fully initialized
-                    sleep(0.1)
-                end
-            end
-
             try
                 if isnothing(data)
                     # download went wrong or provider doesn't have tile.
@@ -228,7 +205,7 @@ setup_axis!(::Makie.AbstractAxis, ext_target, crs) = nothing
 function setup_axis!(axis::Axis, ext_target, crs)
     X = ext_target.X
     Y = ext_target.Y
-    axis.autolimitaspect = 1
+    # axis.autolimitaspect = 1
     Makie.limits!(axis, (X[1], X[2]), (Y[1], Y[2]))
     axis.elements[:background].depth_shift[] = 0.1f0
     translate!(axis.elements[:background], 0, 0, -1000)
@@ -302,11 +279,11 @@ function Base.wait(m::AbstractMap; timeout=50)
     # The download + plot loops need a screen to do their work!
     # wait(m.tiles; timeout=timeout)
 
-    if isnothing(Makie.getscreen(m.figure.scene))
-        screen = display(m.figure.scene)
-    end
-    screen = Makie.getscreen(m.figure.scene)
-    isnothing(screen) && error("No screen after display.")
+    # if isnothing(Makie.getscreen(m.figure.scene))
+    #     screen = display(m.figure.scene)
+    # end
+    # screen = Makie.getscreen(m.figure.scene)
+    # isnothing(screen) && error("No screen after display.")
     start = time()
     while true
         tile_keys = Set(tile_key.((m.provider,), keys(m.foreground_tiles)))

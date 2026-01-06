@@ -69,14 +69,14 @@ function update_tiles!(m::Map, arealike)
     # Without the lock, a few (n_download_threads) old tiles will be downloaded first
     # since they will be the last in the queue until we add the new tiles
     lock(m.tiles.tile_queue) do
+        # Lower-resolution background tiles show first (added first to FIFO queue)
+        # They're quick to get and immediately fill the plot with low-res content
+        foreach(tile -> queue_plot!(m, tile), to_add_keys.background)
+        # Foreground tiles show second, filling out high-res details
+        foreach(tile -> queue_plot!(m, tile), to_add_keys.foreground)
         # Offscreen tiles show last, so scroll and zoom don't show
         # empty white areas or low resolution tiles
         foreach(tile -> queue_plot!(m, tile), to_add_keys.offscreen)
-        # Foreground tiles show in the middle, filling out details
-        foreach(tile -> queue_plot!(m, tile), to_add_keys.foreground)
-        # Lower-resolution background tiles show first
-        # Its quick to get them and they immediately fill the plot
-        foreach(tile -> queue_plot!(m, tile), to_add_keys.background)
     end
 end
 
@@ -230,6 +230,7 @@ function optimal_zoom(m::Map, diagonal)
     actual_zoom = clamp(z, min_zoom(m), max_zoom(m))
     return z, actual_zoom, approx_tiles(m, actual_zoom, diagonal)
 end
+
 function optimal_zoom(crs, diagonal, diagonal_resolution, zoom_range, old_zoom)
     # TODO, this should come from provider
     tile_diag_res = norm((255, 255))
