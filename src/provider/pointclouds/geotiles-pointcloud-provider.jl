@@ -44,10 +44,11 @@ function load_tile_data(provider::GeoTilePointCloudProvider, path::String)
     proj = provider.projs[Threads.threadid()]
     points = get_points(pc, Point3f(pc.coord_offset), Point3f(pc.coord_scale), proj)
     extrema = Point3f.(proj.(Point3f[pc.coord_min, pc.coord_max]))
-    if hasproperty(pc.points[1], :color_channels)
+    if !ismissing(PointClouds.IO.color_channels(pc.points[1]))
         color = map(pc.points) do p
-            c = map(x -> N0f8(x / 255), p.color_channels)
-            return RGB(c[1], c[2], c[3])
+            c = PointClouds.IO.color_channels(p)
+            # TODO, PointClouds says values should be in 0-1 range, but they seem to require *255 to be in 0-1 range.
+            return RGB(c[1] * 255, c[2] * 255, c[3] * 255)
         end
     else
         color = last.(points) # z as fallback
@@ -90,7 +91,7 @@ end
 
 function get_points(las, offset, scale, proj)
     return map(las.points) do p
-        point = Point3f(offset .+ Point3f(p.coords) .* scale)
+        point = Point3f(offset .+ Point3f(PointClouds.IO.coordinates(Integer, p)) .* scale)
         Point3f(proj(point.data))
     end
 end
