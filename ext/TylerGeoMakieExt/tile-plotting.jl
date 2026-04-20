@@ -18,6 +18,9 @@ function create_tileplot!(
         source = tile_crs[2], # tile_crs is a tuple of (tile, crs), we can pass the CRS directly to GeoMakie though
         config.attributes...
     )
+    # For a pure GeoAxis this is OK, because it is guaranteed to be 2D.
+    # But for a 3D axis like GlobeAxis this is not OK and has to be removed.
+    translate!(plot, 0, 0, -10)
     return plot
 end
 

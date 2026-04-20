@@ -19,12 +19,14 @@ hero:
       link: https://github.com/MakieOrg/Tyler.jl
     - theme: brand
       text: Become a Sponsor
-      link: https://makie.org/support/
+      link: https://makie.org/website/support/
       
 features:
   - title: TileProviders
     details: A large collection of tile providers.
+    link: https://github.com/JuliaGeo/TileProviders.jl/
   - title: Makie integration
     details: Well integrated with the Makie ecosystem.
+    link: https://makie.org/
 ---
 ```

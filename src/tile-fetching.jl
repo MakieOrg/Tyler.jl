@@ -234,18 +234,18 @@ function optimal_zoom(crs, diagonal, diagonal_resolution, zoom_range, old_zoom)
     # TODO, this should come from provider
     tile_diag_res = norm((255, 255))
     target_ntiles = diagonal_resolution / tile_diag_res
-    canditates_dict = Dict{Int,Float64}()
+    candidates_dict = Dict{Int,Float64}()
     candidates = @NamedTuple{z::Int, ntiles::Float64}[]
     for z in zoom_range
         ext = Extents.extent(Tile(0, 0, z), crs)
         mini, maxi = Point2.(ext.X, ext.Y)
         diag = norm(maxi .- mini)
         ntiles = diagonal / diag
-        canditates_dict[z] = ntiles
+        candidates_dict[z] = ntiles
         push!(candidates, (; z, ntiles))
     end
-    if haskey(canditates_dict, old_zoom) # for the first invokation, old_zoom is 0, which is not a candidate
-        old_ntiles = canditates_dict[old_zoom]
+    if haskey(candidates_dict, old_zoom) # for the first invokation, old_zoom is 0, which is not a candidate
+        old_ntiles = candidates_dict[old_zoom]
         # If the old zoom level is close to the target number of tiles, return it
         # to change the zoom level less often
         if old_ntiles > (target_ntiles - 1) && old_ntiles < (target_ntiles + 1)

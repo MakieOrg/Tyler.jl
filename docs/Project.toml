@@ -16,7 +16,7 @@ Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LightOSM = "d1922b25-af4e-4ba3-84af-fe9bea896051"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 MapTiles = "fea52e5a-b371-463b-85f5-81770daa2737"
-# OSMMakie = "76b6901f-8821-46bb-9129-841bc9cfe677" # TODO: restore this when OSMMakie.jl has compat with Makie 0.24
+OSMMakie = "76b6901f-8821-46bb-9129-841bc9cfe677"
 TileProviders = "263fe934-28e1-4ae9-998a-c2629c5fede6"
 Tyler = "e170d443-b9d6-418a-9ee8-061e966341ef"
 
@@ -25,3 +25,4 @@ DocumenterVitepress = ">=0.2"
 
 [sources]
 Tyler = {path = ".."}
+OSMMakie = {url = "https://github.com/MakieOrg/OSMMakie.jl", rev = "sd/makie-v0.24"}

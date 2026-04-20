@@ -56,11 +56,11 @@ Creates a `PlotConfig` object to influence how tiles are being plotted.
 
 ```julia
 using Tyler, GLMakie
+using Colors
 
-config = PlotConfig(
-    preprocess = (data) -> data .+ 1,
+config = Tyler.PlotConfig(
+    preprocess = (data) -> RGBf.(Colors.red.(data), 0, 0), # extract only the red channel of the data
     postprocess = (plot) -> translate!(plot, 0, 0, 1),
-    color = :red
 )
 lat, lon = (52.395593, 4.884704)
 delta = 0.1
