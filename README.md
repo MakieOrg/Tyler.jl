@@ -13,7 +13,7 @@
 > Visit the latest documentation at https://makieorg.github.io/Tyler.jl/dev/
 
 > [!IMPORTANT]
-> Become a Sponsor. [Support](https://makie.org/support/) this project.
+> Become a Sponsor. [Support](https://makie.org/website/support/) this project.
 
 ## Install
 

@@ -12,12 +12,6 @@ struct ElevationProvider <: AbstractProvider
     tile_cache::LRU{String}
     downloader::Vector
 end
-
-Tyler.get_tile_format(::ElevationProvider) = Tyler.ElevationData
-TileProviders.options(::ElevationProvider) = nothing
-TileProviders.min_zoom(::ElevationProvider) = 0
-TileProviders.max_zoom(::ElevationProvider) = 16
-
 function ElevationProvider(provider=TileProviders.Esri(:WorldImagery); cache_size_gb=5)
     TileFormat = get_tile_format(provider)
     fetched_tiles = LRU{String,TileFormat}(; maxsize=cache_size_gb * 10^9, by=Base.sizeof)
@@ -25,16 +19,21 @@ function ElevationProvider(provider=TileProviders.Esri(:WorldImagery); cache_siz
     ElevationProvider(provider, fetched_tiles, downloader)
 end
 
+# TileProviders interface
+TileProviders.options(::ElevationProvider) = nothing
+TileProviders.min_zoom(::ElevationProvider) = 0
+TileProviders.max_zoom(::ElevationProvider) = 16
 function TileProviders.geturl(::ElevationProvider, x::Integer, y::Integer, z::Integer)
     return "https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer/tile/$(z)/$(y)/$(x)"
 end
 
+# Tyler interface
+get_tile_format(::ElevationProvider) = ElevationData
+file_ending(::ElevationProvider) = ".lerc"
 function get_downloader(::ElevationProvider)
     cache_dir = joinpath(CACHE_PATH[], "ElevationProvider")
     return PathDownloader(cache_dir)
 end
-
-file_ending(::ElevationProvider) = ".lerc"
 
 function fetch_tile(provider::ElevationProvider, dl::PathDownloader, tile::Tile)
     path = download_tile_data(dl, provider, TileProviders.geturl(provider, tile.x, tile.y, tile.z))

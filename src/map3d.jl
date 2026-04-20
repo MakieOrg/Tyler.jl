@@ -1,5 +1,29 @@
+function Map3D(m::Map; kw...)
+    ax = m.axis
+    # Make a copy of the lscene, so we can easier separate the plots.
+    ax2 = LScene(ax.parent, ax.layoutobservables, ax.blockscene)
+    ax2.scene = Scene(ax.scene; camera=ax.scene.camera, camera_controls=ax.scene.camera_controls)
+    return Map3D(nothing, nothing; figure=m.figure, axis=ax2, kw...)
+end
+function Map3D(extent, extent_crs=wgs84;
+        size=(1000, 1000),
+        figure=Makie.Figure(; size=size),
+        axis=Makie.LScene(figure[1, 1]; show_axis=false),
+        provider=TileProviders.OpenStreetMap(:Mapnik),
+        fetching_scheme=Tiling3D(),
+        args...
+    )
+    return Map(
+        extent, extent_crs;
+        figure=figure,
+        axis=axis,
+        provider=provider,
+        fetching_scheme=fetching_scheme,
+        args...
+    )
+end
 
-using GeometryBasics, LinearAlgebra
+# Tyler methods for LScene
 
 function setup_axis!(axis::LScene, ext_target, crs)
     # Disconnect all events
@@ -21,24 +45,6 @@ function setup_axis!(axis::LScene, ext_target, crs)
     return
 end
 
-function Map3D(extent, extent_crs=wgs84;
-        size=(1000, 1000),
-        figure=Makie.Figure(; size=size),
-        axis=Makie.LScene(figure[1, 1]; show_axis=false),
-        provider=TileProviders.OpenStreetMap(:Mapnik),
-        fetching_scheme=Tiling3D(),
-        args...
-    )
-    return Map(
-        extent, extent_crs;
-        figure=figure,
-        axis=axis,
-        provider=provider,
-        fetching_scheme=fetching_scheme,
-        args...
-    )
-end
-
 function tile_reloader(m::Map{LScene})
     scene = m.axis.scene
     camc = scene.camera_controls
@@ -50,6 +56,7 @@ function tile_reloader(m::Map{LScene})
     end
 end
 
+# 3d utils
 
 function frustum_snapshot(cam::Camera)
     bottom_left = Point4d(-1, -1, 1, 1)
@@ -110,6 +117,7 @@ function frustrum_plane_intersection(cam::Camera, camc::Camera3D)
     end
 end
 
+# TODO: move to GeometryBasics
 function to_rect(extent::Extent)
     return Rect2(extent.X[1], extent.Y[1], extent.X[2] - extent.X[1], extent.Y[2] - extent.Y[1])
 end
