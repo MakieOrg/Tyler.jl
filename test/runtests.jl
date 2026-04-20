@@ -61,6 +61,7 @@ end
 end
 
 @testset "Basemap" begin
+    london = Extents.Extent(X=(-0.0921, -0.0521), Y=(51.5, 51.525))
     @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london, (1000, 1000))
     @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; size = (1000, 1000))
     @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; res = 0.001)
