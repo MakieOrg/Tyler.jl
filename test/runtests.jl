@@ -8,22 +8,22 @@ using GeoInterface
 @testset "Tiles counts" begin
     london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
     m = Tyler.Map(london); m.figure.scene
-    s = display(m) # waits until all tiles are displayed
+    display(m); wait(m)
     @test isempty(m.tiles.tile_queue)
     @test length(m.foreground_tiles) == 25
     @test length(m.tiles.fetched_tiles) == 48
 
     # TODO: Google in WGS84 doesn't really make sense
-    m = Tyler.Map(london; scale=1, provider=Tyler.TileProviders.Google(), crs=Tyler.MapTiles.WGS84()) # waits until all tiles are displayed
-    s = display(m) # waits until all tiles are displayed
+    m = Tyler.Map(london; scale=1, provider=Tyler.TileProviders.Google(), crs=Tyler.MapTiles.WGS84())
+    display(m); wait(m)
     @test isempty(m.tiles.tile_queue)
     @test length(m.foreground_tiles) == 35
     @test length(m.tiles.fetched_tiles) == 71
 
     # test Extent input
     london = Extents.Extent(X=(-0.0921, -0.0521), Y=(51.5, 51.525))
-    m = Tyler.Map(london; scale=1) # waits until all tiles are displayed
-    display(m)
+    m = Tyler.Map(london; scale=1)
+    display(m); wait(m)
     @test isempty(m.tiles.tile_queue)
     @test length(m.foreground_tiles) == 25
     @test length(m.tiles.fetched_tiles) == 48
@@ -38,8 +38,8 @@ end
     
     # test Extent input
     london = Extents.Extent(X=(-0.0921, -0.0521), Y=(51.5, 51.525))
-    m = Tyler.Map(london; scale=1) # waits until all tiles are displayed
-    display(m)
+    m = Tyler.Map(london; scale=1)
+    display(m); wait(m)
     @test Extents.extent(m) isa Extents.Extent
     @test GeoInterface.crs(m) isa Tyler.MapTiles.WebMercator
 end
@@ -59,6 +59,8 @@ end
     wait(m1)
     @test only(contents(m1.figure.layout[1, 2])) isa Axis
 end
+
+include("test-map3d-and-retry.jl")
 
 # Reference tests?
 # provider = TileProviders.NASAGIBS()
