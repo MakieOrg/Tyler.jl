@@ -127,17 +127,33 @@ function Map(extent, extent_crs=wgs84;
     scene = axis.scene
 
     display_task[] = @async begin
+        # Inserting plots before the screen is ready can crash some graphics drivers
+        # (observed on AMD). Hold tiles in the channel until getscreen(scene) is non-nothing.
+        screen_ready = false
         for (tile, data) in downloaded_tiles
             if Makie.isclosed(scene)
                 cleanup_queue!(map, OrderedSet{Tile}())
                 close(map)
                 break
             end
+
+            if !screen_ready
+                if isnothing(Makie.getscreen(scene))
+                    sleep(0.01)
+                    put!(downloaded_tiles, (tile, data)) # re-queue at the back
+                    continue
+                else
+                    screen_ready = true
+                    sleep(0.1) # let the screen finish its first frame
+                end
+            end
+
             try
                 if isnothing(data)
-                    # download went wrong or provider doesn't have tile.
-                    # That means we won't plot this tile and it should not be in the queue anymore
+                    # download failed permanently or provider has no tile here:
+                    # drop from both queues so wait() won't block on it forever.
                     delete!(map.should_get_plotted, tile_key(map.provider, tile))
+                    delete!(map.foreground_tiles, tile)
                 else
                     create_tyler_plot!(map, tile, data)
                 end
@@ -258,7 +274,10 @@ function Base.show(io::IO, m::MIME"image/png", map::AbstractMap)
 end
 
 function Base.display(map::AbstractMap)
-    wait(map)
+    # Do NOT call wait(map) here: on AMD drivers, plots inserted while the screen
+    # is still initializing can crash the driver. Callers that need all tiles loaded
+    # should call wait(map) explicitly after display(map) returns.
+    display(map.figure.scene)
 end
 
 function Base.close(m::Map)
@@ -270,13 +289,12 @@ function Base.close(m::Map)
     close(m.tiles)
 end
 function Base.wait(m::AbstractMap; timeout=50)
-    # The download + plot loops need a screen to do their work!
+    # The download + plot loops need a screen to do their work.
     if isnothing(Makie.getscreen(m.figure.scene))
         screen = display(m.figure.scene)
     end
     screen = Makie.getscreen(m.figure.scene)
     isnothing(screen) && error("No screen after display.")
-    wait(m.tiles; timeout=timeout)
     start = time()
     while true
         tile_keys = Set(tile_key.((m.provider,), keys(m.foreground_tiles)))

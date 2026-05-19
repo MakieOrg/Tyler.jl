@@ -7,13 +7,21 @@ struct TileCache{TileFormat,Downloader}
     # so `Map` can clean up the expected tiles
     downloaded_tiles::Channel{Tuple{Tile,Union{Nothing, TileFormat}}}
     downloader::Vector{Downloader}
+    # Track retry counts for failed downloads (not 404s which are permanent)
+    retry_counts::ThreadSafeDict{String, Int}
+    max_retries::Int
 end
-function TileCache(provider; cache_size_gb=5, max_parallel_downloads=1)
+
+struct CacheMiss end
+const CACHE_MISS = CacheMiss()
+
+function TileCache(provider; cache_size_gb=5, max_parallel_downloads=1, max_retries=3)
     TileFormat = get_tile_format(provider)
     downloader = [get_downloader(provider) for i in 1:max_parallel_downloads]
     fetched_tiles = LRU{String,Union{Nothing, TileFormat}}(; maxsize=cache_size_gb * 10^9, by=Base.summarysize)
     downloaded_tiles = Channel{Tuple{Tile,Union{Nothing, TileFormat}}}(Inf)
     tile_queue = Channel{Tile}(Inf)
+    retry_counts = ThreadSafeDict{String, Int}()
 
     async = Threads.nthreads(:default) <= 1
     if async && max_parallel_downloads > 1
@@ -24,12 +32,12 @@ function TileCache(provider; cache_size_gb=5, max_parallel_downloads=1)
     for thread in 1:max_parallel_downloads
         dl = downloader[thread]
         if async
-            @async run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
+            @async run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles, retry_counts, max_retries)
         else
-            Threads.@spawn run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
+            Threads.@spawn run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles, retry_counts, max_retries)
         end
     end
-    return TileCache{TileFormat,eltype(downloader)}(provider, fetched_tiles, tile_queue, downloaded_tiles, downloader)
+    return TileCache{TileFormat,eltype(downloader)}(provider, fetched_tiles, tile_queue, downloaded_tiles, downloader, retry_counts, max_retries)
 end
 
 # Base methods
@@ -76,7 +84,17 @@ function take_last!(c::Channel)
     end
 end
 
-function run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
+# Re-queue a failed tile after exponential backoff, without blocking the worker.
+function schedule_retry!(tile_queue::Channel{Tile}, tile::Tile, retries::Int)
+    delay = 0.1 * 2^retries # 0.1s, 0.2s, 0.4s, ...
+    @async begin
+        sleep(delay)
+        isopen(tile_queue) && put!(tile_queue, tile)
+    end
+    return
+end
+
+function run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles, retry_counts, max_retries)
     while isopen(tile_queue)
         tile = take_last!(tile_queue) # priorize newly arrived tiles
         result = nothing
@@ -88,23 +106,40 @@ function run_loop(dl, tile_queue, fetched_tiles, provider, downloaded_tiles)
             key = tile_key(provider, tile)
             # if the provider knows it doesn't have a tile, it can return nothing
             isnothing(key) && continue
-            result = get!(fetched_tiles, key) do
+
+            # Atomic cache lookup: haskey + getindex would race with LRU eviction.
+            cached = get(fetched_tiles, key, CACHE_MISS)
+            if !(cached isa CacheMiss)
+                result = cached
+            else
                 try
-                    return fetch_tile(provider, dl, tile)
+                    fetched = fetch_tile(provider, dl, tile)
+                    fetched_tiles[key] = fetched
+                    delete!(retry_counts, key)
+                    result = fetched
                 catch e
-                    if isa(e, RequestError)
-                        status = e.response.status
-                        if (status == 404 || status == 500)
-                            @warn "tile $(tile) not available, will not download again" maxlog = 10
-                            return nothing
-                        end
+                    permanent = e isa RequestError && e.response.status == 404
+                    retries = get(retry_counts, key, 0)
+                    status = e isa RequestError ? e.response.status : nothing
+                    if permanent
+                        @warn "tile $(tile) not available (404), will not download again" maxlog = 10
+                        fetched_tiles[key] = nothing
+                        delete!(retry_counts, key)
+                    elseif retries >= max_retries
+                        @warn "tile $(tile) failed after $(max_retries) retries (status: $(status)), giving up" exception=(e, catch_backtrace()) maxlog = 10
+                        fetched_tiles[key] = nothing
+                        delete!(retry_counts, key)
+                    else
+                        retry_counts[key] = retries + 1
+                        @warn "tile $(tile) download failed (status: $(status)), retry $(retries + 1)/$(max_retries)" maxlog = 20
+                        schedule_retry!(tile_queue, tile, retries)
+                        continue # don't emit a downloaded_tiles entry for this attempt
                     end
-                    rethrow(e)
                 end
             end
         catch e
             @warn "Error while fetching tile on thread $(Threads.threadid())" exception = (e, catch_backtrace())
-            nothing
+            result = nothing
         end
         put!(downloaded_tiles, (tile, result))
         yield()
