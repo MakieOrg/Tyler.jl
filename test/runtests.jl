@@ -11,14 +11,14 @@ using GeoInterface
     display(m); wait(m)
     @test isempty(m.tiles.tile_queue)
     @test length(m.foreground_tiles) == 25
-    @test length(m.tiles.fetched_tiles) == 48
+    @test length(m.tiles.fetched_tiles) == 71
 
     # TODO: Google in WGS84 doesn't really make sense
     m = Tyler.Map(london; scale=1, provider=Tyler.TileProviders.Google(), crs=Tyler.MapTiles.WGS84())
     display(m); wait(m)
     @test isempty(m.tiles.tile_queue)
     @test length(m.foreground_tiles) == 35
-    @test length(m.tiles.fetched_tiles) == 71
+    @test length(m.tiles.fetched_tiles) == 75
 
     # test Extent input
     london = Extents.Extent(X=(-0.0921, -0.0521), Y=(51.5, 51.525))
@@ -26,7 +26,7 @@ using GeoInterface
     display(m); wait(m)
     @test isempty(m.tiles.tile_queue)
     @test length(m.foreground_tiles) == 25
-    @test length(m.tiles.fetched_tiles) == 48
+    @test length(m.tiles.fetched_tiles) == 71
 end
 @testset "Interfaces" begin
     from = Tyler.MapTiles.WebMercator()

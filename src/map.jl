@@ -307,5 +307,10 @@ function Base.wait(m::AbstractMap; timeout=50)
         end
         sleep(0.01)
     end
+    # Drain any background/prefetch tiles still in the download queue. Done
+    # *after* the foreground-plot loop so the screen is fully initialized by
+    # the time additional plots get inserted (avoids the AMD driver crash
+    # that prompted the original wait(m.tiles) removal).
+    wait(m.tiles; timeout=max(timeout - (time() - start), 0.0))
     return m
 end
