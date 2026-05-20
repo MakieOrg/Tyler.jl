@@ -22,6 +22,9 @@ Tyler = "e170d443-b9d6-418a-9ee8-061e966341ef"
 
 [sources]
 Tyler = {path = ".."}
+Makie = {url = "https://github.com/MakieOrg/Makie.jl.git", rev = "sd/fastpixel-shader-fix", subdir = "Makie"}
+GLMakie = {url = "https://github.com/MakieOrg/Makie.jl.git", rev = "sd/fastpixel-shader-fix", subdir = "GLMakie"}
+CairoMakie = {url = "https://github.com/MakieOrg/Makie.jl.git", rev = "sd/fastpixel-shader-fix", subdir = "CairoMakie"}
 
 [compat]
 DocumenterVitepress = ">=0.2"
