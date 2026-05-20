@@ -20,7 +20,7 @@ When layering providers over each other with `Map(map::Map; ...)`, you can use `
 - `provider`: a TileProviders.jl `Provider`.
 - `max_parallel_downloads`: limits the attempted simultaneous downloads, with a default of `16`.
 - `cache_size_gb`: limits the cache for storing tiles, with a default of `5`.
-- `fetching_scheme=Halo2DTiling()`: The tile fetching scheme. Can be SimpleTiling(), Halo2DTiling(), or Tiling3D().
+- `fetching_scheme=Halo2DTiling()`: The tile fetching scheme. Can be `SimpleTiling()`, `Halo2DTiling()`, `Tiling3D()`, or `SSETiling3D()`. The latter is recommended for `Map3D`: it picks tiles by screen-space error, mixing zoom levels (fine near the camera, coarse on the horizon) instead of one zoom for the whole view.
 - `scale`: a tile scaling factor. Low number decrease the downloads but reduce the resolution.
     The default is `0.5`.
 - `plot_config`: A `PlotConfig` object to change the way tiles are plotted.
@@ -127,19 +127,42 @@ function Map(extent, extent_crs=wgs84;
     scene = axis.scene
 
     display_task[] = @async begin
+        # Inserting plots before the screen is ready can crash some graphics drivers
+        # (observed on AMD). Hold tiles in the channel until getscreen(scene) is non-nothing.
+        screen_ready = false
+        # Throttled progressive-refinement timestamp: each arrived tile may have
+        # tightened bounds in the provider (see ElevationProvider.bounds_cache),
+        # which can change SSE selection — even with the camera stationary.
+        # Re-fire update_tiles! at most a few times per second so the view
+        # keeps refining while sitting still.
+        last_refine = Ref(0.0)
         for (tile, data) in downloaded_tiles
             if Makie.isclosed(scene)
                 cleanup_queue!(map, OrderedSet{Tile}())
                 close(map)
                 break
             end
+
+            if !screen_ready
+                if isnothing(Makie.getscreen(scene))
+                    sleep(0.01)
+                    put!(downloaded_tiles, (tile, data)) # re-queue at the back
+                    continue
+                else
+                    screen_ready = true
+                    sleep(0.1) # let the screen finish its first frame
+                end
+            end
+
             try
                 if isnothing(data)
-                    # download went wrong or provider doesn't have tile.
-                    # That means we won't plot this tile and it should not be in the queue anymore
+                    # download failed permanently or provider has no tile here:
+                    # drop from both queues so wait() won't block on it forever.
                     delete!(map.should_get_plotted, tile_key(map.provider, tile))
+                    delete!(map.foreground_tiles, tile)
                 else
                     create_tyler_plot!(map, tile, data)
+                    maybe_refine_for_sse!(map, last_refine)
                 end
             catch e
                 @warn "error while creating tile" exception = (e, Base.catch_backtrace())
@@ -216,7 +239,10 @@ toggle_visibility!(m::Map) = m.axis.scene.visible[] = !m.axis.scene.visible[]
 
 function tile_reloader(map::Map{Axis})
     axis = map.axis
-    throttled = Makie.Observables.throttle(0.2, axis.finallimits)
+    # 100 ms throttle: tile fetching catches up to fast pans twice as quickly
+    # as the previous 200 ms setting, at the cost of ~doubling the cheap
+    # work per frame (still well under 1% CPU on a modern machine).
+    throttled = Makie.Observables.throttle(0.1, axis.finallimits)
     on(axis.scene, throttled; update=true) do extent
         update_tiles!(map, extent)
         return
@@ -258,7 +284,10 @@ function Base.show(io::IO, m::MIME"image/png", map::AbstractMap)
 end
 
 function Base.display(map::AbstractMap)
-    wait(map)
+    # Do NOT call wait(map) here: on AMD drivers, plots inserted while the screen
+    # is still initializing can crash the driver. Callers that need all tiles loaded
+    # should call wait(map) explicitly after display(map) returns.
+    display(map.figure.scene)
 end
 
 function Base.close(m::Map)
@@ -270,13 +299,12 @@ function Base.close(m::Map)
     close(m.tiles)
 end
 function Base.wait(m::AbstractMap; timeout=50)
-    # The download + plot loops need a screen to do their work!
+    # The download + plot loops need a screen to do their work.
     if isnothing(Makie.getscreen(m.figure.scene))
         screen = display(m.figure.scene)
     end
     screen = Makie.getscreen(m.figure.scene)
     isnothing(screen) && error("No screen after display.")
-    wait(m.tiles; timeout=timeout)
     start = time()
     while true
         tile_keys = Set(tile_key.((m.provider,), keys(m.foreground_tiles)))
@@ -289,5 +317,10 @@ function Base.wait(m::AbstractMap; timeout=50)
         end
         sleep(0.01)
     end
+    # Drain any background/prefetch tiles still in the download queue. Done
+    # *after* the foreground-plot loop so the screen is fully initialized by
+    # the time additional plots get inserted (avoids the AMD driver crash
+    # that prompted the original wait(m.tiles) removal).
+    wait(m.tiles; timeout=max(timeout - (time() - start), 0.0))
     return m
 end

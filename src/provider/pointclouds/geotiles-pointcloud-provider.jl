@@ -13,11 +13,28 @@ struct GeoTilePointCloudProvider <: TileProviders.AbstractProvider
     subset::String
     lookup
     projs::Vector{Proj.Transformation}
+    bounds_cache::ThreadSafeDict{Tile, NTuple{2, Float64}}
 end
+
+# Netherlands is essentially at sea level: Mt. Vaalserberg (322 m) is the
+# highest point; some polders sit at -7 m. A 50 m headroom covers structures
+# and trees the AHN dataset captures. Using this tight default instead of
+# the global Mariana-Trench-to-Everest fallback makes SSE frustum culling
+# prune ~150× more aggressively on intermediate-LOD recursion (since the
+# AABB is 25× thinner in Z than the global default).
+default_netherlands_z_bounds() = (-15.0, 350.0)
+
+pointcloud_bounds_file() = joinpath(CACHE_PATH[], "GeoTilePointCloudProvider", "bounds.bin")
+
 function GeoTilePointCloudProvider(; baseurl="https://geotiles.citg.tudelft.nl", subset="AHN1_T")
     projs = [Proj.Transformation(GFT.EPSG(28992), GFT.EPSG(3857)) for i in 1:Threads.maxthreadid()]
-    return GeoTilePointCloudProvider(baseurl, subset, get_ahn_sub_mapping(), projs)
+    bounds_cache = ThreadSafeDict{Tile, NTuple{2, Float64}}()
+    load_bounds_file!(pointcloud_bounds_file(), bounds_cache)
+    return GeoTilePointCloudProvider(baseurl, subset, get_ahn_sub_mapping(), projs, bounds_cache)
 end
+
+tile_z_bounds(p::GeoTilePointCloudProvider, tile::Tile) =
+    ancestor_or_default_bounds(p.bounds_cache, tile, default_netherlands_z_bounds())
 
 # TileProviders interface
 TileProviders.options(::GeoTilePointCloudProvider) = nothing
@@ -44,10 +61,16 @@ function load_tile_data(provider::GeoTilePointCloudProvider, path::String)
     proj = provider.projs[Threads.threadid()]
     points = get_points(pc, Point3f(pc.coord_offset), Point3f(pc.coord_scale), proj)
     extrema = Point3f.(proj.(Point3f[pc.coord_min, pc.coord_max]))
-    if hasproperty(pc.points[1], :color_channels)
+    # The LAS header already carries coord_min/coord_max — no need to scan
+    # all points. After proj, extrema[1].z / extrema[2].z are the tight
+    # vertical bounds in web-mercator-metres. Tile key isn't available here
+    # (load_tile_data only knows the path), so we attach the bounds to the
+    # data object and let fetch_tile cache them per-tile below.
+    if !ismissing(PointClouds.IO.color_channels(pc.points[1]))
         color = map(pc.points) do p
-            c = map(x -> N0f8(x / 255), p.color_channels)
-            return RGB(c[1], c[2], c[3])
+            c = PointClouds.IO.color_channels(p)
+            # TODO, PointClouds says values should be in 0-1 range, but they seem to require *255 to be in 0-1 range.
+            return RGB(c[1] * 255, c[2] * 255, c[3] * 255)
         end
     else
         color = last.(points) # z as fallback
@@ -60,6 +83,25 @@ function load_tile_data(provider::GeoTilePointCloudProvider, path::String)
     )
     bb = Rect3d(extrema[1], extrema[2] .- extrema[1])
     return PointCloudData(points, color, bb, best_markersize[provider.subset])
+end
+
+# Specialised fetch_tile so we can cache the tight per-tile bounds derived
+# from the LAS header. Without this, 3D SSE recursion uses the Netherlands
+# default (-15..350) for every intermediate tile, which is much looser than
+# the actual ~5 m of variation in a single sub-km AHN tile.
+function fetch_tile(provider::GeoTilePointCloudProvider, dl::PathDownloader, tile::Tile)
+    url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
+    isnothing(url) && return nothing
+    path = download_tile_data(dl, provider, url)
+    data = load_tile_data(provider, path)
+    if data !== nothing
+        mini, maxi = extrema(p -> p[3], data.points)
+        provider.bounds_cache[tile] = (Float64(mini), Float64(maxi))
+        # Persist periodically so a Julia restart starts with tight bounds.
+        length(provider.bounds_cache) % 50 == 0 &&
+            save_bounds_file(pointcloud_bounds_file(), provider.bounds_cache)
+    end
+    return data
 end
 
 # Geotile utils
@@ -90,7 +132,7 @@ end
 
 function get_points(las, offset, scale, proj)
     return map(las.points) do p
-        point = Point3f(offset .+ Point3f(p.coords) .* scale)
+        point = Point3f(offset .+ Point3f(PointClouds.IO.coordinates(Integer, p)) .* scale)
         Point3f(proj(point.data))
     end
 end

@@ -47,7 +47,7 @@ begin
     lat, lon = (47.087441, 13.377214)
     delta = 0.3
     ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
-    cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=FastShading, material=mat, colormap=:alpine)
+    cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=true, material=mat, colormap=:alpine)
     m = Tyler.Map3D(ext; provider=ElevationProvider(nothing), plot_config=cfg)
 end
 
@@ -66,7 +66,7 @@ begin
     image = ElevationProvider(nothing)
     cfg = Tyler.MeshScatterPlotconfig(markersize=5, marker=Rect3f(Vec3f(0), Vec3f(1)))
     m1 = Tyler.Map3D(ext; provider=provider, plot_config=cfg, max_parallel_downloads=1)
-    cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=FastShading, colormap=:alpine, postprocess=(p-> translate!(p, 0, 0, -1f0)))
+    cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=true, colormap=:alpine, postprocess=(p-> translate!(p, 0, 0, -1f0)))
     m2 = Tyler.Map3D(m1; provider=image, plot_config=cfg, max_parallel_downloads=1)
     m1
 end
@@ -83,7 +83,7 @@ begin
     # subset = "AHN4_T" # Takes _really_ long to load, even from disk (~300mb compressed points per tile)
     provider = GeoTilePointCloudProvider(subset=subset)
     m1 = Tyler.Map3D(ext; provider=provider, max_parallel_downloads=1)
-    cfg = Tyler.PlotConfig(shading=FastShading, colormap=:alpine, postprocess=(p -> translate!(p, 0, 0, -100.0f0)))
+    cfg = Tyler.PlotConfig(shading=true, colormap=:alpine, postprocess=(p -> translate!(p, 0, 0, -100.0f0)))
     m2 = Tyler.Map3D(ext; provider=ElevationProvider(), figure=m1.figure, axis=m1.axis, max_parallel_downloads=1, plot_config=cfg)
     m1
 end
@@ -170,7 +170,7 @@ begin
     delta = 0.5
     ext = Rect2f(lon - delta / 2, lat - delta / 2, delta, delta)
     mat = (type=:Uber, roughness=0.2, ior=1.390)
-    cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=FastShading, material=plastic, colormap=:alpine)
+    cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=true, material=plastic, colormap=:alpine)
     m = Tyler.Map3D(ext; provider=ElevationProvider(nothing), plot_config=cfg, max_plots=5)
     render_rpr(m, "alpine", 10000000)
 end
@@ -185,7 +185,7 @@ begin
     mat = plastic_material()
     cfg = Tyler.MeshScatterPlotconfig(markersize=5, material=mat)
     m = Tyler.Map3D(ext; provider=provider, plot_config=cfg, max_plots=3, size=(2000, 2000))
-    cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=FastShading, material=mat, colormap=:Blues)
+    cfg = Tyler.PlotConfig(preprocess=pc -> map(p -> p .* 2, pc), shading=true, material=mat, colormap=:Blues)
     m2 = Tyler.Map3D(m; provider=ElevationProvider(nothing), plot_config=cfg, max_plots=5)
     wait(m)
     render_rpr(m, "pointclouds")

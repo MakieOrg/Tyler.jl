@@ -17,25 +17,54 @@ function move_to_back!(plot, amount, ::Rect2)
     end
 end
 
-move_z(m::AbstractMap, plot, tile::Tile, bounds::Rect3) = nothing
-function move_z(m::AbstractMap, plot, tile::Tile, bounds::Rect2)
-    # We want to see everything of the current zoom and more zoomed out,
-    # to fill gaps until they load
+function move_z(m::AbstractMap, plot, tile::Tile, bounds::Rect3)
+    # 3D elevation tiles: bias finer-LOD foreground tiles toward the camera
+    # via depth_shift, so at LOD boundaries the finer tile always wins the
+    # depth test. Without this, the slight triangle-interpolation mismatch
+    # between a z=N tile's edge (257 samples) and the adjacent z=N+1 tiles'
+    # edges (514 samples) shows up as the speckled / zigzag artifact along
+    # the boundary that looks like z-fighting.
+    #
+    # Only apply depth_shift to Surface plots — Scatter (pointclouds) and
+    # other 3D plot types don't have the same LOD-boundary mismatch problem
+    # and on AMD drivers we've seen depth_shift writes on FastPixel scatter
+    # plots correlate with GPU context loss.
+    z_ref = m.zoom[]
     if haskey(m.foreground_tiles, tile)
         plot.visible = true
-        amount = -tile.z
-    elseif m.zoom[] >= tile.z
-        # @show "zoom is more or equal tile"
+        if plot isa Makie.Surface
+            plot.depth_shift = Float32(z_ref - tile.z) / 10000f0
+        end
+    elseif z_ref >= tile.z
         plot.visible = true
-        # move_to_front!(plot, amount, bounds)
-        # If we are zoomed in we want to see everything
-        # of that zoom and more zoomed out, to fill gaps until they load
-        amount = 30 - tile.z # Flip the order for negative shift
-        move_to_back!(plot, amount, bounds)
+        if plot isa Makie.Surface
+            plot.depth_shift = Float32(z_ref - tile.z + 30) / 10000f0
+        end
     else
         plot.visible = false
     end
-    # @show m.zoom[] tile.z amount shift
+    return
+end
+function move_z(m::AbstractMap, plot, tile::Tile, bounds::Rect2)
+    # Keep every plot visible and rely on depth_shift to layer them: finer
+    # tiles in front, coarser tiles behind. The previous version hid any
+    # tile with z > m.zoom[], which caused a visible blink on zoom-out — the
+    # just-foreground finer tiles vanished before the coarser ones could
+    # take their place. Leaving them visible as a high-res overlay until
+    # cull_plots! reclaims them removes the blink entirely.
+    plot.visible = true
+    z_ref = m.zoom[]
+    if haskey(m.foreground_tiles, tile)
+        plot.depth_shift = 0f0
+    elseif tile.z > z_ref
+        # Was foreground before a zoom-out — keep as fine overlay on top so
+        # the new (coarser) foreground doesn't blink to lower-res while it
+        # takes over the screen.
+        move_to_back!(plot, -(tile.z - z_ref), bounds)
+    else
+        # Coarser fallback — push behind everything finer.
+        move_to_back!(plot, 30 - tile.z, bounds)
+    end
 end
 
 struct PlotConfig <: AbstractPlotConfig
@@ -106,18 +135,38 @@ function filter_overlapping!(m::Map, bounds::Rect3, tile, key)
     bounds2d = Rect2d(bounds)
     for (other_key, (plot, other_tile, other_bounds)) in copy(m.plots)
         other_bounds2d = Rect2d(other_bounds)
-        # If overlap
+        # If overlap (one contains the other — parent/child case)
         if bounds2d in other_bounds2d || other_bounds2d in bounds2d
-            if haskey(m.foreground_tiles, tile)
-                # the new plot has priority since it's in the newest current tile set
+            new_in_fg   = haskey(m.foreground_tiles, tile)
+            other_in_fg = haskey(m.foreground_tiles, other_tile)
+            if new_in_fg && other_in_fg
+                # Both wanted (e.g. SSE mixed-LOD): keep the finer tile,
+                # remove the coarser. This avoids z-fighting between a child
+                # and its still-rendered parent when both are simultaneously
+                # in the foreground set.
+                if tile.z > other_tile.z
+                    remove_plot!(m, other_key)
+                elseif other_tile.z > tile.z
+                    delete!(m.should_get_plotted, key)
+                    return true
+                else
+                    # same zoom and overlapping: latest wins (the previous
+                    # behaviour for matching-LOD updates)
+                    remove_plot!(m, other_key)
+                end
+            elseif new_in_fg
+                # only the new tile is in the current set — it wins
                 remove_plot!(m, other_key)
-            elseif haskey(m.foreground_tiles, other_tile)
+            elseif other_in_fg
+                # only the existing plot is in the current set — keep it
                 delete!(m.should_get_plotted, key)
-                # the existing plot has priority so we skip the new plot
                 return true
             else
-                # If both are not in foreground_tiles, we remove the plot farthest away from the current zoom level
-                if abs(tile.z - m.zoom[]) <= abs(other_tile.z - m.zoom[])
+                # Neither wanted: keep whichever is closer to m.zoom[],
+                # falling back to finer if tied.
+                d_new = abs(tile.z - m.zoom[])
+                d_old = abs(other_tile.z - m.zoom[])
+                if d_new < d_old || (d_new == d_old && tile.z >= other_tile.z)
                     remove_plot!(m, other_key)
                 else
                     delete!(m.should_get_plotted, key)
@@ -180,6 +229,11 @@ function create_tyler_plot!(m::AbstractMap, tile::Tile, data)
     mplot.visible = true
     get_postprocess(cfg)(mplot)
     m.plots[key] = (mplot, tile, bounds)
+    # Tile arrivals can land between two update_tiles! calls, so depth_shift
+    # starts at Makie's default (0) and would tie with the foreground tiles
+    # until the next update_tiles!. Set the correct shift immediately based
+    # on the current m.zoom + foreground_tiles.
+    move_z(m, mplot, tile, bounds)
     return
 end
 
@@ -209,6 +263,17 @@ function get_bounds(tile::Tile, data::ElevationData, crs)
     return Rect3d(origin, w)
 end
 
+# Currently a no-op. Proper terrain skirts require *additional* downward
+# geometry below each tile's edge, not modification of edge vertices: lowering
+# the boundary row/col turns every tile edge into a visible V-notch where the
+# surface dips and rises again. With Makie.surface!'s grid geometry there is
+# no way to add extra triangles, so for now we rely on adjacent same-LOD tiles
+# sharing exact boundary samples (no crack) and accept small cracks at the
+# rare LOD-transition boundaries in SSE mode. A proper skirt implementation
+# would switch elevation tiles from surface! to mesh! with explicit skirt
+# triangles — left for a future change.
+with_skirt(elev::AbstractMatrix{<:Real}) = elev
+
 function create_tileplot!(
     config::PlotConfig, axis::AbstractAxis, m, data::ElevationData, bounds::Rect, tile_crs
 )
@@ -218,7 +283,7 @@ function create_tileplot!(
     uv_transform = isempty(data.color) ? Makie.automatic : Mat{2,3,Float32}(0, 1, 1, 0, 0, 0)
     p = Makie.surface!(
         axis.scene,
-        (mini[1], maxi[1]), (mini[2], maxi[2]), data.elevation;
+        (mini[1], maxi[1]), (mini[2], maxi[2]), with_skirt(data.elevation);
         color...,
         uv_transform = uv_transform,
         shading=Makie.NoShading,
@@ -234,7 +299,7 @@ function update_tile_plot!(
 )
     mini, maxi = extrema(bounds)
     cd = !isempty(data.color) ? (color=data.color,) : (;)
-    Makie.update!(plot, (mini[1], maxi[1]), (mini[2], maxi[2]), data.elevation; cd...)
+    Makie.update!(plot, (mini[1], maxi[1]), (mini[2], maxi[2]), with_skirt(data.elevation); cd...)
     return
 end
 
@@ -292,14 +357,23 @@ end
 function create_tileplot!(
     config::PlotConfig, axis::AbstractAxis, m, data::PointCloudData, ::Rect, tile_crs
 )
+    # CRITICAL: `markerspace=:data` combined with FastPixel marker crashes
+    # GLMakie's draw_pixel_scatter shader path on AMD drivers (and produces
+    # severe artifacts on other drivers / in CI). The shader needs to convert
+    # data-space marker size to pixel size every frame using the projection
+    # matrix, and with web-mercator coordinates in the millions of metres the
+    # Float32 precision loss produces NaN/Inf gl_PointSize → GPU context loss.
+    # `:pixel` keeps marker size in screen-space (so zooming doesn't change
+    # the visual point size) but avoids the unstable per-frame conversion.
     p = Makie.scatter!(
         axis.scene, data.points;
         color=data.color,
         marker=Makie.FastPixel(),
         markersize=data.msize,
-        markerspace=:data,
+        markerspace=:pixel,
         fxaa=false,
         inspectable=false,
+        transparency=true,
         config.attributes...
     )
     return p

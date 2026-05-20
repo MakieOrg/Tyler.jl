@@ -15,14 +15,17 @@ HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
 Interpolations = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
 LightOSM = "d1922b25-af4e-4ba3-84af-fe9bea896051"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 MapTiles = "fea52e5a-b371-463b-85f5-81770daa2737"
 OSMMakie = "76b6901f-8821-46bb-9129-841bc9cfe677"
 TileProviders = "263fe934-28e1-4ae9-998a-c2629c5fede6"
 Tyler = "e170d443-b9d6-418a-9ee8-061e966341ef"
 
-[compat]
-DocumenterVitepress = ">=0.2"
-
 [sources]
 Tyler = {path = ".."}
-OSMMakie = {url = "https://github.com/MakieOrg/OSMMakie.jl", rev = "sd/makie-v0.24"}
+Makie = {url = "https://github.com/MakieOrg/Makie.jl.git", rev = "sd/fastpixel-shader-fix", subdir = "Makie"}
+GLMakie = {url = "https://github.com/MakieOrg/Makie.jl.git", rev = "sd/fastpixel-shader-fix", subdir = "GLMakie"}
+CairoMakie = {url = "https://github.com/MakieOrg/Makie.jl.git", rev = "sd/fastpixel-shader-fix", subdir = "CairoMakie"}
+
+[compat]
+DocumenterVitepress = ">=0.2"
