@@ -10,7 +10,7 @@ function Map3D(extent, extent_crs=wgs84;
         figure=Makie.Figure(; size=size),
         axis=Makie.LScene(figure[1, 1]; show_axis=false),
         provider=TileProviders.OpenStreetMap(:Mapnik),
-        fetching_scheme=Tiling3D(),
+        fetching_scheme=SSETiling3D(),
         args...
     )
     return Map(
