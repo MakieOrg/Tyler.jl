@@ -105,19 +105,49 @@ function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Re
     return _basemap(provider, bbox, zoom)
 end
 
-# Convert a fetched tile to a matrix in Julia's column-major (x, y) layout,
-# ready to be stitched into the basemap.
-# Image tiles arrive in the Images.jl row-major layout, so rotate them.
-_tile_matrix(data::AbstractMatrix{<: Colorant}) = rotr90(data)
-# Elevation tiles are already in (x, y) layout.  We only return the elevation
-# for now; any color information the provider fetched is dropped.
-_tile_matrix(data::ElevationData) = data.elevation
-_tile_matrix(data) = error("`basemap` cannot handle tiles of type $(typeof(data)).  Supported tile types are images (`AbstractMatrix{<: Colorant}`) and `Tyler.ElevationData`.")
+"""
+    Tyler.tile_matrix(data)::AbstractMatrix
 
-# The value used for areas of the basemap not covered by any tile.
-# This also determines the element type of the returned array.
-_basemap_fill(::AbstractMatrix{<: Colorant}) = RGBAf(0, 0, 0, 1)
-_basemap_fill(::ElevationData) = NaN32
+Convert the data fetched for a single tile (as returned by `Tyler.fetch_tile`) to a
+matrix in Julia's column-major `(x, y)` memory layout, with `y` increasing northwards,
+ready to be stitched into a [`basemap`](@ref).
+
+Methods are provided for:
+- `AbstractMatrix{<: Colorant}` (image tiles): rotated from the Images.jl row-major
+  layout to `(x, y)` via `rotr90`.
+- `Tyler.ElevationData`: returns only the elevation matrix, for now; any color
+  information the provider fetched is dropped.
+
+This function is the hook that makes [`basemap`](@ref) work with custom tile types:
+if your provider's `fetch_tile` returns some other type, add a method of this function
+for it (and one of [`Tyler.base_fill`](@ref), which provides the fill value for areas
+not covered by any tile and thereby the element type of the basemap array).
+
+This function is considered API, but is not exported.
+"""
+tile_matrix(data::AbstractMatrix{<: Colorant}) = rotr90(data)
+tile_matrix(data::ElevationData) = data.elevation
+tile_matrix(data) = error("`basemap` cannot handle tiles of type $(typeof(data)).  Supported tile types are images (`AbstractMatrix{<: Colorant}`) and `Tyler.ElevationData`.  To add support for a new tile type, define a method for `Tyler.tile_matrix`.")
+
+"""
+    Tyler.base_fill(data)
+
+Return the value used to fill areas of a [`basemap`](@ref) not covered by any tile,
+given the data fetched for a single tile.  The type of this value also determines the
+element type of the array that `basemap` returns, so every value a
+[`Tyler.tile_matrix`](@ref) for the same tile type produces must be convertible to it.
+
+Methods are provided for:
+- `AbstractMatrix{<: Colorant}` (image tiles): opaque black, `RGBAf(0, 0, 0, 1)`.
+- `Tyler.ElevationData`: `NaN32`.
+
+Extend this alongside [`Tyler.tile_matrix`](@ref) to make `basemap` work with custom
+tile types.
+
+This function is considered API, but is not exported.
+"""
+base_fill(::AbstractMatrix{<: Colorant}) = RGBAf(0, 0, 0, 1)
+base_fill(::ElevationData) = NaN32
 
 function _basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Rect2{<: Real}, Extent}, zoom::Int)
     bbox = Extents.extent(boundingbox)
@@ -133,14 +163,14 @@ function _basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{R
     for tile in tilegrid
         data = fetch_tile(provider, downloader, tile)
         isnothing(data) && continue # the provider has no tile here
-        tile_matrix = _tile_matrix(data)
+        matrix = tile_matrix(data)
         if isnothing(image)
             # The first fetched tile tells us the tile size and element type,
             # so we don't have to assume 256×256 image tiles
             # (e.g. elevation tiles are 257×257, retina tiles 512×512).
-            tile_widths = size(tile_matrix)
+            tile_widths = size(matrix)
             full_size = tile_widths .* length.((xrange, yrange))
-            fill_value = _basemap_fill(data)
+            fill_value = base_fill(data)
             # Warn before allocating if the result would be very large - it's
             # easy to ask for something enormous by accident, e.g. via a too-fine `res`.
             image_megabytes = prod(full_size) * sizeof(fill_value) / 1024^2
@@ -157,7 +187,7 @@ function _basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{R
         # Tile y indices run north to south, against the axis direction,
         # so flip them relative to the grid when placing the tile.
         offset = (tile.x - first(xrange), last(yrange) - tile.y) .* tile_widths
-        image[(:).(offset .+ 1, offset .+ tile_widths)...] .= tile_matrix
+        image[(:).(offset .+ 1, offset .+ tile_widths)...] .= matrix
     end
     isnothing(image) && error("The provider $(provider) returned no tiles for the bounding box $(bbox) at zoom level $(zoom).")
     # Return the image together with its axes.
