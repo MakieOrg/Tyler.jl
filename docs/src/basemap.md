@@ -64,6 +64,24 @@ BACKEND.activate!() # hide
 ````
 
 
+### Elevation data
+
+Elevation providers like `Tyler.ElevationProvider` also work; they return a matrix
+of elevation values (in meters) instead of an image.
+
+````@example elevation
+using Tyler, Makie
+using Tyler.Extents
+
+xs, ys, elevation = basemap(
+    Tyler.ElevationProvider(nothing),
+    Extent(X = (5.9, 10.5), Y = (45.8, 47.8)); # the Alps
+    z = 7
+)
+
+heatmap(xs, ys, elevation; colormap = :terrain, axis = (; aspect = DataAspect()))
+````
+
 ### OpenSnowMap on polar stereographic projection
 
 ````@example opensnowmap

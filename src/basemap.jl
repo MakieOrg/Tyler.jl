@@ -53,6 +53,12 @@ All returned coordinates and images are in the **Web Mercator** coordinate syste
 
 The input bounding box must be in the **WGS84** (long/lat) coordinate system.
 
+Tiles are fetched through the provider's regular Tyler download machinery, so any
+provider that works with `Tyler.Map` works here.  Image providers return a
+`Matrix{RGBAf}`; elevation providers like [`Tyler.ElevationProvider`](@ref) return a
+`Matrix{Float32}` of elevation values instead (only the elevation is returned for now -
+any color information is dropped).
+
 ## Example
 
 ```julia
@@ -99,66 +105,64 @@ function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Re
     return _basemap(provider, bbox, zoom)
 end
 
+# Convert a fetched tile to a matrix in Julia's column-major (x, y) layout,
+# ready to be stitched into the basemap.
+# Image tiles arrive in the Images.jl row-major layout, so rotate them.
+_tile_matrix(data::AbstractMatrix{<: Colorant}) = rotr90(data)
+# Elevation tiles are already in (x, y) layout.  We only return the elevation
+# for now; any color information the provider fetched is dropped.
+_tile_matrix(data::ElevationData) = data.elevation
+_tile_matrix(data) = error("`basemap` cannot handle tiles of type $(typeof(data)).  Supported tile types are images (`AbstractMatrix{<: Colorant}`) and `Tyler.ElevationData`.")
+
+# The value used for areas of the basemap not covered by any tile.
+# This also determines the element type of the returned array.
+_basemap_fill(::AbstractMatrix{<: Colorant}) = RGBAf(0, 0, 0, 1)
+_basemap_fill(::ElevationData) = NaN32
+
 function _basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Rect2{<: Real}, Extent}, zoom::Int)
     bbox = Extents.extent(boundingbox)
     # Generate a `TileGrid` from our zoom level and bbox.
     tilegrid = MapTiles.TileGrid(bbox, zoom, MapTiles.WGS84())
-    # Compute the dimensions of the tile grid, so we can feed them into a 
-    # Raster later.
     tilegrid_extent = Extents.extent(tilegrid, MapTiles.WebMercator())
-    #= TODO:
-    Here we assume all tiles are 256x256.  
-    It's easy to compute this though, by either:
-    - Making a sample query for the tile (0, 0, 0) (but you are not guaranteed this exists)
-    - Some function that returns the tile size for a given provider / dispatch form
-    =#
-    tile_widths = (256, 256)
-    tilegrid_size = tile_widths .* length.(tilegrid.grid.indices)
-    # Warn if the resulting image would be very large - it's easy to ask for
-    # something enormous by accident, e.g. via a too-fine `res`.
-    image_megabytes = prod(tilegrid_size) * sizeof(RGBAf) / 1024^2
-    if image_megabytes > 100
-        @warn """
-        The requested basemap will be $(tilegrid_size[1])×$(tilegrid_size[2]) pixels \
-        ($(round(image_megabytes, digits = 1)) MB, $(length(tilegrid)) tiles to download).
-        If this is not what you intended, pass a smaller `size`, a coarser `res`, \
-        a smaller `z`, or a smaller `max_zoom_level`.
-        """
-    end
-    # We need to know the start and end indices of the tile grid, so we can 
-    # place the tiles in the right place.
-    tile_start_idxs = minimum(first.(Tuple.(tilegrid.grid))), minimum(last.(Tuple.(tilegrid.grid)))
-    tile_end_idxs = maximum(first.(Tuple.(tilegrid.grid))), maximum(last.(Tuple.(tilegrid.grid)))
-    # Using the size information, we initiate an `RGBA{Float32}` image array.
-    # You can later convert to whichever size / type you want by simply broadcasting.
-    image_receptacle = fill(RGBAf(0,0,0,1), tilegrid_size)
-    # Now, we iterate over the tiles, and read and then place them into the array.
+    # Use the provider's own downloader and tile loader, so that any provider
+    # Tyler supports (e.g. `ElevationProvider`) works here too.
+    downloader = get_downloader(provider)
+    xrange, yrange = tilegrid.grid.indices
+    image = nothing
+    tile_widths = (0, 0)
     for tile in tilegrid
-        # Download the tile
-        url = TileProviders.geturl(provider, tile.x, tile.y, tile.z)
-        result = HTTP.get(url)
-        # Read into an in-memory array (Images.jl layout)
-        img = FileIO.load(FileIO.query(IOBuffer(result.body)))
-        # The thing with the y indices is that they go in the reverse of the natural order.
-        # So, we simply subtract the y index from the end index to get the correct placement.
-        image_start_relative = (
-            tile.x - tile_start_idxs[1], 
-            tile_end_idxs[2] - tile.y,
-        )
-        # The absolute start is simply the relative start times the tile width.
-        image_start_absolute = (image_start_relative .* tile_widths)
-        # The indices for the view into the receptacle are the absolute start 
-        # plus one, to the absolute end.
-        idxs = (:).(image_start_absolute .+ 1, image_start_absolute .+ tile_widths)
-        @debug image_start_relative image_start_absolute idxs
-        # Place the tile into the receptacle.  Note that we rotate the image to 
-        # be in the correct orientation.
-        image_receptacle[idxs...] .= rotr90(img) # change to Julia memory layout
+        data = fetch_tile(provider, downloader, tile)
+        isnothing(data) && continue # the provider has no tile here
+        tile_matrix = _tile_matrix(data)
+        if isnothing(image)
+            # The first fetched tile tells us the tile size and element type,
+            # so we don't have to assume 256×256 image tiles
+            # (e.g. elevation tiles are 257×257, retina tiles 512×512).
+            tile_widths = size(tile_matrix)
+            full_size = tile_widths .* length.((xrange, yrange))
+            fill_value = _basemap_fill(data)
+            # Warn before allocating if the result would be very large - it's
+            # easy to ask for something enormous by accident, e.g. via a too-fine `res`.
+            image_megabytes = prod(full_size) * sizeof(fill_value) / 1024^2
+            if image_megabytes > 100
+                @warn """
+                The requested basemap will be $(full_size[1])×$(full_size[2]) pixels \
+                ($(round(image_megabytes, digits = 1)) MB, $(length(tilegrid)) tiles to download).
+                If this is not what you intended, pass a smaller `size`, a coarser `res`, \
+                a smaller `z`, or a smaller `max_zoom_level`.
+                """
+            end
+            image = fill(fill_value, full_size)
+        end
+        # Tile y indices run north to south, against the axis direction,
+        # so flip them relative to the grid when placing the tile.
+        offset = (tile.x - first(xrange), last(yrange) - tile.y) .* tile_widths
+        image[(:).(offset .+ 1, offset .+ tile_widths)...] .= tile_matrix
     end
-    # Now, we have a complete image.
-    # We can also produce the image's axes:
-    # Note that this is in the Web Mercator coordinate system.
-    return (tilegrid_extent.X, tilegrid_extent.Y, image_receptacle)
+    isnothing(image) && error("The provider $(provider) returned no tiles for the bounding box $(bbox) at zoom level $(zoom).")
+    # Return the image together with its axes.
+    # Note that these are in the Web Mercator coordinate system.
+    return (tilegrid_extent.X, tilegrid_extent.Y, image)
 end
 
 # We also use this in some Makie converts to allow `image` to work

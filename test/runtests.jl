@@ -70,6 +70,9 @@ end
     @test_throws AssertionError Tyler.basemap(Tyler.TileProviders.Google(), london; size = (1000, 1000), z = 12)
     x, y, img = Tyler.basemap(Tyler.TileProviders.Google(), london; size = (1000, 1000))
     @test img isa Matrix{<: Makie.RGBA}
+    # Elevation providers return only the elevation (for now)
+    x, y, elevation = Tyler.basemap(Tyler.ElevationProvider(nothing), london; z = 10)
+    @test elevation isa Matrix{Float32}
 end
 
 # Reference tests?
