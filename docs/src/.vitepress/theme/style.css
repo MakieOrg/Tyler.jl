@@ -235,3 +235,17 @@ kbd {
   box-shadow: inset 0 -1px 0 var(--vp-c-bg-soft-mute);
   line-height: 0.95em;
 }
+
+/* Component: Docstring Custom Block */
+
+.jldocstring.custom-block {
+  border: 1px solid var(--vp-c-gray-2);
+  color: var(--vp-c-text-1)
+}
+
+.jldocstring.custom-block summary {
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+  margin: 0 0 8px;
+}

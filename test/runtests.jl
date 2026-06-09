@@ -60,6 +60,21 @@ end
     @test only(contents(m1.figure.layout[1, 2])) isa Axis
 end
 
+@testset "Basemap" begin
+    london = Extents.Extent(X=(-0.0921, -0.0521), Y=(51.5, 51.525))
+    @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; size = (1000, 1000))
+    @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; size = (X = 1000, Y = 1000))
+    @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; res = 0.001)
+    @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; z = 12)
+    @test_throws AssertionError Tyler.basemap(Tyler.TileProviders.Google(), london)
+    @test_throws AssertionError Tyler.basemap(Tyler.TileProviders.Google(), london; size = (1000, 1000), z = 12)
+    x, y, img = Tyler.basemap(Tyler.TileProviders.Google(), london; size = (1000, 1000))
+    @test img isa Matrix{<: Makie.RGBA}
+    # Elevation providers return only the elevation (for now)
+    x, y, elevation = Tyler.basemap(Tyler.ElevationProvider(nothing), london; z = 10)
+    @test elevation isa Matrix{Float32}
+end
+
 # Reference tests?
 # provider = TileProviders.NASAGIBS()
 # m = Tyler.Map(Rect2f(0, 50, 40, 20), 5; provider=provider, min_tiles=8, max_tiles=32)
