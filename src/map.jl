@@ -26,6 +26,9 @@ When layering providers over each other with `Map(map::Map; ...)`, you can use `
 - `plot_config`: A `PlotConfig` object to change the way tiles are plotted.
 - `max_zoom`: The maximum zoom level to display, with a default of `TileProviders.max_zoom(provider)`.
 - `max_plots=400:` The maximum number of plots to keep displayed at the same time.
+- `wait_on_tick=true`: If `true`, `OneTimeRenderTick`s (used by `save`, `record`,
+    and `colorbuffer`) block on `wait(map)` until all currently requested tiles
+    are downloaded and plotted. Interactive rendering is unaffected.
 """
 struct Map{Ax<:Makie.AbstractAxis} <: AbstractMap
     provider::AbstractProvider
@@ -89,7 +92,8 @@ function Map(extent, extent_crs=wgs84;
     fetching_scheme=Halo2DTiling(),
     max_zoom=TileProviders.max_zoom(provider),
     max_plots=400,
-    scale=1)
+    scale=1,
+    wait_on_tick=true)
 
     # Extent
     # if extent input is a HyperRectangle then convert to type Extent
@@ -149,6 +153,31 @@ function Map(extent, extent_crs=wgs84;
 
     tile_reloader(map)
 
+    if wait_on_tick
+        wait_on_tick!(map)
+    end
+
+    return map
+end
+
+"""
+    wait_on_tick!(map::AbstractMap)
+
+Install a callback on the axis scene's tick event that blocks every
+`OneTimeRenderTick` on `wait(map)`, so that static renders (triggered by
+`save`, `record`, `colorbuffer`, …) capture fully-loaded tiles rather than
+whatever happens to be on screen at the moment of capture.
+
+Regular interactive `RegularRenderTick`s are left untouched.
+"""
+function wait_on_tick!(map::AbstractMap)
+    scene = map.axis.scene
+    on(scene, events(scene).tick) do tick
+        if tick.state === Makie.OneTimeRenderTick
+            wait(map)
+        end
+        return
+    end
     return map
 end
 
@@ -214,10 +243,31 @@ end
 
 toggle_visibility!(m::Map) = m.axis.scene.visible[] = !m.axis.scene.visible[]
 
+function throttle_by_tick(scene, observable_to_throttle, time = 2)
+    # Construct a new observable that is throttled by the tick event.
+    throttled = Observable{eltype(observable_to_throttle)}(observable_to_throttle[])
+    time_since_update = Ref{Float64}(0.0)
+    # Listen to the tick event and update the throttled observable.
+    on(scene, events(scene).tick) do tick
+        if tick.state == Makie.RegularRenderTick
+            time_since_update[] += tick.delta_time
+            if time_since_update[] > 0.2
+                time_since_update[] = 0.0
+                if observable_to_throttle[] != throttled[]
+                    throttled[] = observable_to_throttle[]
+                end
+            end
+        else # any other tick state, run the update immediately.  this allows for smoothness in record etc.
+            throttled[] = observable_to_throttle[]
+        end
+    end
+    return throttled
+end
+
 function tile_reloader(map::Map{Axis})
     axis = map.axis
-    throttled = Makie.Observables.throttle(0.2, axis.finallimits)
-    on(axis.scene, throttled; update=true) do extent
+    throttled_bbox = throttle_by_tick(axis.scene, axis.finallimits)
+    on(axis.scene, throttled_bbox; update=true) do extent
         update_tiles!(map, extent)
         return
     end
