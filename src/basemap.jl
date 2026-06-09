@@ -40,8 +40,13 @@ function _z_index(extent::Union{Rect,Extent}, res::NamedTuple, crs; tile_size = 
     return findmin(x -> abs(x - target_ntiles), tiles_at_z)[2]
 end
 
+# Normalize `size`/`res` style values to an `(x, y)` tuple,
+# accepting `(; X, Y)` named tuples in any field order.
+_xy(val::NamedTuple) = (val.X, val.Y)
+_xy(val) = (first(val), last(val))
+
 """
-    basemap(provider::TileProviders.Provider, bbox::Extent; size, res, min_zoom_level, max_zoom_level)::(xs, ys, img)
+    basemap(provider::TileProviders.Provider, bbox::Extent; size, res, z, min_zoom_level, max_zoom_level)::(xs, ys, img)
 
 Download the most suitable basemap for the given bounding box and size, return a tuple of `(x_interval, y_interval, image)`.
 All returned coordinates and images are in the **Web Mercator** coordinate system (since that's how tiles are defined).
@@ -56,34 +61,48 @@ basemap(TileProviders.Google(), Extent(X = (-0.0921, -0.0521), Y = (51.5, 51.525
 
 ## Keyword arguments
 
-`size` and `res` are mutually exclusive, and you must provide one.
+`size`, `res` and `z` are mutually exclusive, and you must provide exactly one of them.
 
-`min_zoom_level - 0` and `max_zoom_level = 16` are the minimum and maximum zoom levels to consider.
+`size` should be a tuple `(xsize, ysize)` (a named tuple `(X = xsize, Y = ysize)` also works),
+and `res` should be a tuple of the form `(X = xres, Y = yres)` to match the extent.
 
-`res` should be a tuple of the form `(X=xres, Y=yres)` to match the extent.
+Note that `size` and `res` are **approximate**: they are only used to pick a zoom level,
+and the returned image covers the full grid of tiles at that zoom level which intersects
+the bounding box.  The actual image is therefore usually larger than requested.
+
+`z` is the tile zoom level.  If provided, it is used directly instead of being computed
+from `size` or `res`.
+
+`min_zoom_level = 0` and `max_zoom_level = 16` are the minimum and maximum zoom levels
+to consider when computing a zoom level from `size` or `res`.  They are ignored if `z`
+is provided explicitly.
 """
-function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Rect2{<: Real}, Extent}; 
-        size = nothing, res = nothing, min_zoom_level = 0, max_zoom_level = 16
+function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Rect2{<: Real}, Extent};
+        size = nothing, res = nothing, z = nothing, min_zoom_level = 0, max_zoom_level = 16
     )
     bbox = Extents.extent(boundingbox)
     # First, handle keyword arguments
-    @assert (isnothing(size) || isnothing(res)) "You must provide either `size` or `res`, but not both."
-    @assert !(isnothing(size) && isnothing(res)) "You must provide either the `size` or `res` keywords.  Current values: $(size), $(res)"
-    _size = if isnothing(size) 
-        # convert resolution to size using bbox and round(Int, x)
-        (round(Int, (bbox.X[2] - bbox.X[1]) / first(res)), round(Int, (bbox.Y[2] - bbox.Y[1]) / last(res)))
+    @assert count(!isnothing, (size, res, z)) == 1 "You must provide exactly one of the `size`, `res` or `z` keywords.  Current values: size = $(size), res = $(res), z = $(z)"
+    zoom = if !isnothing(z)
+        z
     else
-        (first(size), last(size))
+        _size = if isnothing(size)
+            # convert resolution to size using bbox and round(Int, x)
+            _res = _xy(res)
+            (round(Int, (bbox.X[2] - bbox.X[1]) / _res[1]), round(Int, (bbox.Y[2] - bbox.Y[1]) / _res[2]))
+        else
+            _xy(size)
+        end
+        # Obtain the optimal Z-index that covers the bbox at the desired resolution.
+        clamp(_z_index(bbox, (X=_size[1], Y=_size[2]), MapTiles.WGS84()), min_zoom_level, max_zoom_level)
     end
-    return basemap(provider, bbox, _size; min_zoom_level, max_zoom_level)
+    return _basemap(provider, bbox, zoom)
 end
 
-function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Rect2{<: Real}, Extent}, size::Tuple{Int, Int}; min_zoom_level = 0, max_zoom_level = 16)
+function _basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Rect2{<: Real}, Extent}, zoom::Int)
     bbox = Extents.extent(boundingbox)
-    # Obtain the optimal Z-index that covers the bbox at the desired resolution.
-    optimal_z_index = clamp(_z_index(bbox, (X=size[2], Y=size[1]), MapTiles.WGS84()), min_zoom_level, max_zoom_level)
     # Generate a `TileGrid` from our zoom level and bbox.
-    tilegrid = MapTiles.TileGrid(bbox, optimal_z_index, MapTiles.WGS84())
+    tilegrid = MapTiles.TileGrid(bbox, zoom, MapTiles.WGS84())
     # Compute the dimensions of the tile grid, so we can feed them into a 
     # Raster later.
     tilegrid_extent = Extents.extent(tilegrid, MapTiles.WebMercator())
@@ -95,6 +114,17 @@ function basemap(provider::TileProviders.AbstractProvider, boundingbox::Union{Re
     =#
     tile_widths = (256, 256)
     tilegrid_size = tile_widths .* length.(tilegrid.grid.indices)
+    # Warn if the resulting image would be very large - it's easy to ask for
+    # something enormous by accident, e.g. via a too-fine `res`.
+    image_megabytes = prod(tilegrid_size) * sizeof(RGBAf) / 1024^2
+    if image_megabytes > 100
+        @warn """
+        The requested basemap will be $(tilegrid_size[1])×$(tilegrid_size[2]) pixels \
+        ($(round(image_megabytes, digits = 1)) MB, $(length(tilegrid)) tiles to download).
+        If this is not what you intended, pass a smaller `size`, a coarser `res`, \
+        a smaller `z`, or a smaller `max_zoom_level`.
+        """
+    end
     # We need to know the start and end indices of the tile grid, so we can 
     # place the tiles in the right place.
     tile_start_idxs = minimum(first.(Tuple.(tilegrid.grid))), minimum(last.(Tuple.(tilegrid.grid)))
@@ -135,7 +165,7 @@ end
 Makie.used_attributes(trait::Makie.ImageLike, provider::TileProviders.AbstractProvider, bbox::Union{Rect2, Extent}, size::Union{Int, Tuple{Int, Int}}) = (:min_zoom_level, :max_zoom_level)
 
 function Makie.convert_arguments(trait::Makie.ImageLike, provider::TileProviders.AbstractProvider, bbox::Extent, size::Union{Int, Tuple{Int, Int}}; min_zoom_level = 0, max_zoom_level = 16)
-    return Makie.convert_arguments(trait, basemap(provider, bbox, (first(size), last(size)); min_zoom_level, max_zoom_level)...)
+    return Makie.convert_arguments(trait, basemap(provider, bbox; size = (first(size), last(size)), min_zoom_level, max_zoom_level)...)
 end
 
 function Makie.convert_arguments(trait::Makie.ImageLike, provider::TileProviders.AbstractProvider, bbox::Rect2, size::Union{Int, Tuple{Int, Int}}; min_zoom_level = 0, max_zoom_level = 16)

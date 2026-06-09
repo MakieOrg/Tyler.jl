@@ -28,8 +28,8 @@ using Tyler.Extents
 
 xs, ys, img = basemap(
     TileProviders.OpenStreetMap(),
-    Extent(X=(-0.5, 0.5), Y=(51.25, 51.75)),
-    (1024, 1024)
+    Extent(X=(-0.5, 0.5), Y=(51.25, 51.75));
+    size = (1024, 1024)
 )
 ````
 
@@ -49,7 +49,7 @@ const BACKEND = Makie.current_backend() # hide
 
 provider = TileProviders.NASAGIBS(:ViirsEarthAtNight2012)
 
-xs, ys, img = basemap(provider, Extent(X=(-90, 90), Y=(-90, 90)), (1024, 1024))
+xs, ys, img = basemap(provider, Extent(X=(-90, 90), Y=(-90, 90)); size = (1024, 1024))
 
 meshimage(
     xs, ys, img; 
@@ -73,8 +73,8 @@ using Tyler.Extents
 meshimage(
     basemap(
         TileProviders.OpenSnowMap(),
-        Extent(X=(-180, 180), Y=(50, 90)),
-        (1024, 1024)
+        Extent(X=(-180, 180), Y=(50, 90));
+        size = (1024, 1024)
     )...;
     source = "+proj=webmerc",
     axis = (; type = GeoAxis, dest = "+proj=stere +lat_0=90 +lat_ts=71 +lon_0=-45"),

@@ -62,10 +62,13 @@ end
 
 @testset "Basemap" begin
     london = Extents.Extent(X=(-0.0921, -0.0521), Y=(51.5, 51.525))
-    @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london, (1000, 1000))
     @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; size = (1000, 1000))
+    @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; size = (X = 1000, Y = 1000))
     @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; res = 0.001)
-    x, y, img = Tyler.basemap(Tyler.TileProviders.Google(), london, (1000, 1000))
+    @test_nowarn Tyler.basemap(Tyler.TileProviders.Google(), london; z = 12)
+    @test_throws AssertionError Tyler.basemap(Tyler.TileProviders.Google(), london)
+    @test_throws AssertionError Tyler.basemap(Tyler.TileProviders.Google(), london; size = (1000, 1000), z = 12)
+    x, y, img = Tyler.basemap(Tyler.TileProviders.Google(), london; size = (1000, 1000))
     @test img isa Matrix{<: Makie.RGBA}
 end
 
