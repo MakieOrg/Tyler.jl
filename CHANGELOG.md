@@ -1,3 +1,8 @@
+# Unreleased
+
+- Send a `User-Agent` header identifying Tyler and its version with every tile request, instead of the generic `curl/x.y julia/x.y` default that tile servers such as OpenStreetMap block [#170](https://github.com/MakieOrg/Tyler.jl/issues/170).
+  - Applications built on Tyler should identify themselves by setting `Tyler.USER_AGENT[]`, or per downloader via the `user_agent` keyword of `ByteDownloader`/`PathDownloader`.
+
 # v0.2.1
 
 - Allow creating `Map`s on `GeoAxis` (from GeoMakie) via a package extension [#114](https://github.com/MakieOrg/Tyler.jl/pull/114).
