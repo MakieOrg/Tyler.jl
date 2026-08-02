@@ -26,11 +26,6 @@ const USER_AGENT = Ref{String}("")
 
 default_user_agent() = "Tyler.jl/$(something(Base.pkgversion(Tyler), "unknown")) (+https://github.com/MakieOrg/Tyler.jl)"
 
-# Downloads.jl otherwise identifies us as `curl/x.y julia/x.y`, which tile servers block,
-# so every request carries these headers. Kept per downloader to avoid reallocating them
-# for each tile.
-request_headers(user_agent::AbstractString) = ["User-Agent" => String(user_agent)]
-
 struct NoDownload <: AbstractDownloader end
 
 """
@@ -44,12 +39,15 @@ struct ByteDownloader <: AbstractDownloader
     downloader::Downloads.Downloader
     io::IOBuffer
     bytes::Vector{UInt8}
+    # The user agent goes out as a header instead of via CURLOPT_USERAGENT in the easy_hook
+    # below, since Downloads.jl adds its own `curl/x.y julia/x.y` header whenever we pass
+    # none, and a header beats that option.
     headers::Vector{Pair{String,String}}
 end
 function ByteDownloader(timeout=3; user_agent=USER_AGENT[])
     downloader = Downloads.Downloader()
     downloader.easy_hook = (easy, info) -> Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_LOW_SPEED_TIME, timeout)
-    return ByteDownloader(timeout, downloader, IOBuffer(), UInt8[], request_headers(user_agent))
+    return ByteDownloader(timeout, downloader, IOBuffer(), UInt8[], ["User-Agent" => user_agent])
 end
 
 function download_tile_data(dl::ByteDownloader, provider, url)
@@ -79,7 +77,7 @@ function PathDownloader(cache_dir; timeout=5, cache_size_gb=5, user_agent=USER_A
     lru = LRU{String, Int}(maxsize=cache_size_gb * 10^9, by=identity)
     downloader = Downloads.Downloader()
     downloader.easy_hook = (easy, info) -> Downloads.Curl.setopt(easy, Downloads.Curl.CURLOPT_LOW_SPEED_TIME, timeout)
-    return PathDownloader(timeout, downloader, cache_dir, lru, request_headers(user_agent))
+    return PathDownloader(timeout, downloader, cache_dir, lru, ["User-Agent" => user_agent])
 end
 
 function download_tile_data(dl::PathDownloader, provider::AbstractProvider, url)
