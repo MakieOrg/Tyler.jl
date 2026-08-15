@@ -67,6 +67,29 @@ For some providers additional configuration steps are necessary, look at the `Ti
 
 :::
 
+## Identifying your application
+
+Tile servers use the `User-Agent` header of a request to tell their users apart, and several
+of them block traffic that does not identify itself - the [OSM Tile Usage Policy](https://operations.osmfoundation.org/policies/tiles/)
+is the best known example. Tyler therefore names itself and its version in every request it
+makes, e.g. `Tyler.jl/0.2.6 (+https://github.com/MakieOrg/Tyler.jl)`.
+
+If you build an application on top of Tyler, identify that application instead, ideally
+together with a way of contacting you:
+
+```julia
+using Tyler
+Tyler.USER_AGENT[] = "MyTownMaps/1.4 (+https://mytownmaps.example.com; maps@example.com)"
+```
+
+::: info
+
+Set this before creating a `Map`, since downloaders read `Tyler.USER_AGENT[]` when they are
+created. A single downloader can also be identified separately, via the `user_agent` keyword
+of `Tyler.ByteDownloader` and `Tyler.PathDownloader`.
+
+:::
+
 ## Figure size & aspect ratio
 
 Although, the figure size can be controlled by passing additional arguments to `Map`, it's better to define a Figure first and then continue with a normal Makie's figure creation workflow, namely

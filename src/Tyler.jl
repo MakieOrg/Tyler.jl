@@ -34,6 +34,7 @@ const CACHE_PATH = Ref("")
 function __init__()
     # Initialize at init for relocatability
     CACHE_PATH[] = @get_scratch!("download-cache")
+    USER_AGENT[] = default_user_agent()
 end
 
 abstract type AbstractPlotConfig end

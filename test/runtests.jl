@@ -4,6 +4,8 @@ using GLMakie
 using Extents
 using GeoInterface
 
+include("user-agent.jl")
+
 # Default
 @testset "Tiles counts" begin
     london = Rect2f(-0.0921, 51.5, 0.04, 0.025)
